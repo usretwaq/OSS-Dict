@@ -27,20 +27,24 @@
         android:orientation="horizontal"
         android:visibility="gone">
 
+        <!-- Fades out at an edge it can be scrolled past: the folders that run on under the
+             button next to the row would otherwise look joined to that button. The space
+             around the folders is part of what scrolls, or it would cut through the fade. -->
         <HorizontalScrollView
             android:id="@+id/folder_scroll"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:clipToPadding="false"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp"
+            android:fadingEdgeLength="24dp"
+            android:requiresFadingEdge="horizontal"
             android:scrollbars="none">
 
             <com.google.android.material.chip.ChipGroup
                 android:id="@+id/folder_chips"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
                 app:selectionRequired="true"
                 app:singleLine="true"
                 app:singleSelection="true" />

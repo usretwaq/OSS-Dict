@@ -278,8 +278,10 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
                 return;
             }
             folderChipToReveal = null;
-            int left = chips.getLeft() + chip.getLeft() - bar.getPaddingLeft();
-            int right = chips.getLeft() + chip.getRight() + bar.getPaddingRight();
+            // Clear of the edges by the length the row fades out over there
+            int margin = bar.getHorizontalFadingEdgeLength();
+            int left = Math.max(0, chips.getLeft() + chip.getLeft() - margin);
+            int right = chips.getLeft() + chip.getRight() + margin;
             if (left < bar.getScrollX()) {
                 bar.smoothScrollTo(left, 0);
             } else if (right > bar.getScrollX() + bar.getWidth()) {
