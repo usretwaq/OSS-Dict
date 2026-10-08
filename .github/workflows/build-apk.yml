@@ -1,0 +1,140 @@
+name: Build APK
+
+# Builds the fork's own app ("OSS Dict+": bookmark folders and notes) and publishes the
+# APK as a GitHub release, so it can be downloaded straight onto a phone.
+#
+# Unlike release.yml this needs no secrets: the APK is signed with the key in
+# ci/personal-build.keystore, see ci/README.md.
+
+on:
+  push:
+    branches:
+      - 'feat/**'
+  workflow_dispatch:
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  KEYSTORE_FILE: ci/personal-build.keystore
+  KEYSTORE_PASSWORD: ossdict-plus
+  KEYSTORE_ALIAS: ossdictplus
+  # SHA-256 of the signing certificate; the build fails if the APK carries another one
+  EXPECTED_CERT_SHA256: e829749b2a431003d6dc220dbc25c85ae9df7b84d4648b434c43be400f01de31
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      version_name: ${{ steps.version.outputs.version_name }}
+      tag: ${{ steps.version.outputs.tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Work out the version
+        id: version
+        run: |
+          base_code=$(grep -oP '^\s*versionCode\s+\K\d+' build.gradle | head -1)
+          base_name=$(grep -oP '^\s*versionName\s+"\K[^"]+' build.gradle | head -1)
+          # Grows with every build, and stays above upstream's own numbering of the same base
+          version_code=$((base_code * 1000 + GITHUB_RUN_NUMBER))
+          version_name="${base_name}-folders.${GITHUB_RUN_NUMBER}"
+          echo "version_code=${version_code}" >> "$GITHUB_OUTPUT"
+          echo "version_name=${version_name}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${version_name}" >> "$GITHUB_OUTPUT"
+          echo "Building ${version_name} (${version_code})"
+
+      - name: Unit tests (bookmark storage and backup)
+        run: ./gradlew --no-daemon testDebugUnitTest --tests 'itkach.aard2.descriptor.*' 2>&1 | tee build-tests.log
+
+      - name: Build signed APKs
+        run: |
+          ./gradlew --no-daemon assembleRelease assembleDebug \
+            -Pandroid.injected.signing.store.file="${GITHUB_WORKSPACE}/${KEYSTORE_FILE}" \
+            -Pandroid.injected.signing.store.password="${KEYSTORE_PASSWORD}" \
+            -Pandroid.injected.signing.key.alias="${KEYSTORE_ALIAS}" \
+            -Pandroid.injected.signing.key.password="${KEYSTORE_PASSWORD}" \
+            -Pandroid.injected.version.code="${{ steps.version.outputs.version_code }}" \
+            -Pandroid.injected.version.name="${{ steps.version.outputs.version_name }}" \
+            2>&1 | tee build-apk.log
+
+      - name: Collect and check the APKs
+        run: |
+          mkdir -p dist
+          release_apk=$(ls build/outputs/apk/release/*.apk | head -1)
+          debug_apk=$(ls build/outputs/apk/debug/*.apk | head -1)
+          cp "$release_apk" "dist/OSS-Dict-plus-${{ steps.version.outputs.version_name }}.apk"
+          cp "$debug_apk" "dist/OSS-Dict-plus-${{ steps.version.outputs.version_name }}-debug.apk"
+          build_tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          for apk in dist/*.apk; do
+            echo "== $apk"
+            "$build_tools/aapt2" dump badging "$apk" | grep -E "^package:|^sdkVersion|^targetSdkVersion|^application-label:"
+            "$build_tools/apksigner" verify --print-certs "$apk" | tee cert.txt
+            grep -qi "SHA-256 digest: ${EXPECTED_CERT_SHA256}" cert.txt
+          done
+          ls -la dist
+
+      - name: Upload APKs as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OSS-Dict-plus-${{ steps.version.outputs.version_name }}
+          path: dist/*.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "OSS Dict+ is OSS-Dict with **bookmark folders and notes**."
+            echo
+            echo "To install: open this page on the phone, download the \`.apk\` below and open it."
+            echo "It installs next to the original OSS-Dict (it has its own app id), and newer"
+            echo "builds from this page update it in place."
+            echo
+            echo "Built from commit ${GITHUB_SHA}."
+          } > release-notes.md
+          gh release create "${{ steps.version.outputs.tag }}" \
+            "dist/OSS-Dict-plus-${{ steps.version.outputs.version_name }}.apk" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "OSS Dict+ ${{ steps.version.outputs.version_name }}" \
+            --notes-file release-notes.md
+
+      # The job logs are not readable without signing in to GitHub: keep a copy on a
+      # branch, where the failure can be read with plain git.
+      - name: Keep the logs of a failed build
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/ci-logs
+          cp build-*.log /tmp/ci-logs/ 2>/dev/null || true
+          cp -r build/reports /tmp/ci-logs/reports 2>/dev/null || true
+          cd /tmp/ci-logs
+          echo "run ${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT} commit ${GITHUB_SHA}" > RUN.txt
+          git init -q
+          git checkout -q -b ci-logs
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
+            commit -q -m "Logs of failed build ${GITHUB_RUN_NUMBER} (${GITHUB_SHA})"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-logs
