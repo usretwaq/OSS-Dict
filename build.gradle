@@ -42,7 +42,7 @@ android {
 
     defaultConfig {
         namespace "itkach.aard2"
-        applicationId "com.akylas.aard2"
+        applicationId "io.github.usretwaq.ossdict"
         minSdk 24
         targetSdk 36
         versionCode 80

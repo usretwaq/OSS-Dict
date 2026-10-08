@@ -13,8 +13,8 @@
         android:shortcutLongLabel="@string/shortcut_lookup_long_label"
         android:shortcutShortLabel="@string/shortcut_lookup_short_label">
         <intent
-            android:action="com.akylas.aard2.action.LOOKUP"
+            android:action="io.github.usretwaq.ossdict.action.LOOKUP"
             android:targetClass="itkach.aard2.MainActivity"
-            android:targetPackage="com.akylas.aard2" />
+            android:targetPackage="io.github.usretwaq.ossdict" />
     </shortcut>
 </shortcuts>
