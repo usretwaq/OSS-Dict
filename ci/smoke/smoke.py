@@ -190,8 +190,11 @@ def start_main():
 
 
 def lookup(word):
-    shell("am start -W -n %s -a aard2.lookup -e query %s" % (ARTICLE, word))
-    wait_for(text="Folders & note", timeout=60)
+    # NEW_TASK | CLEAR_TOP, as the README says: without the flags a second lookup only
+    # brings the article of the first one back to the front
+    shell("am start -W -f 335544320 -n %s -a aard2.lookup -e query %s" % (ARTICLE, word))
+    wait_for(text=word, timeout=60)
+    wait_for(text="Bookmark", timeout=30)
     time.sleep(1.5)
 
 
@@ -201,6 +204,101 @@ def open_tab(name):
     candidates = find(dump(), text=name)
     tap(max(candidates, key=lambda node: center(node)[1]))
     time.sleep(1.0)
+
+
+# ---- the folder selector above the bookmark list: a row that scrolls sideways ---
+
+CHIP_LABEL = re.compile(r"^(.+ \(\d+\)|New folder|Manage folders)$")
+
+
+def visible_chips():
+    return [node for node in dump().iter("node") if CHIP_LABEL.match(node.get("text") or "")]
+
+
+def chip_labels():
+    return [node.get("text") for node in visible_chips()]
+
+
+def at_start(labels):
+    return bool(labels) and labels[0].startswith("All (")
+
+
+def at_end(labels):
+    # "Manage folders" closes the row once folders exist, "New folder" before that
+    return "Manage folders" in labels or (len(labels) == 2 and labels[1] == "New folder")
+
+
+def scroll_chips(forward):
+    """Swipes the row sideways. Only for a row wider than the screen: a swipe that does not
+    start on a chip turns the page of the tabs instead."""
+    chips = visible_chips()
+    if not chips:
+        raise AssertionError("no folder selector on screen: %s" % texts(dump())[:40])
+    y = center(chips[0])[1]
+    width = int(re.search(r"(\d+)x\d+", shell("wm size")).group(1))
+    left, right = int(width * 0.25), int(width * 0.75)
+    if forward:
+        shell("input swipe %d %d %d %d 400" % (right, y, left, y))
+    else:
+        shell("input swipe %d %d %d %d 400" % (left, y, right, y))
+    time.sleep(1.0)
+
+
+def all_chips():
+    """Labels of the whole selector, in order, scrolling through it when it does not fit."""
+    labels = chip_labels()
+    for _ in range(8):
+        if at_start(labels):
+            break
+        scroll_chips(forward=False)
+        labels = chip_labels()
+    collected = list(labels)
+    for _ in range(10):
+        if at_end(labels):
+            break
+        scroll_chips(forward=True)
+        labels = chip_labels()
+        collected += [item for item in labels if item not in collected]
+    for _ in range(8):
+        if at_start(chip_labels()):
+            break
+        scroll_chips(forward=False)
+    return collected
+
+
+def expect_chips(*wanted):
+    deadline = time.time() + 20
+    while True:
+        labels = all_chips()
+        if labels == list(wanted):
+            return
+        if time.time() > deadline:
+            raise AssertionError("folder selector shows %s, expected %s" % (labels, list(wanted)))
+        time.sleep(1)
+
+
+def find_chip(label):
+    for forward in (True, False):
+        for _ in range(10):
+            chips = visible_chips()
+            matches = [node for node in chips if node.get("text") == label]
+            if matches:
+                return matches[0]
+            labels = [node.get("text") for node in chips]
+            if at_end(labels) if forward else at_start(labels):
+                break
+            scroll_chips(forward=forward)
+    raise AssertionError("no %r in the folder selector, it shows %s" % (label, all_chips()))
+
+
+def tap_chip(label):
+    tap(find_chip(label))
+
+
+def open_article_dialog_from_menu():
+    tap_text(text="More options")
+    tap_text(text="Folders & note")
+    wait_for(text="New folder")
 
 
 # ---- steps --------------------------------------------------------------------
@@ -278,15 +376,21 @@ def update_to_release(release_apk):
     shot("dictionaries_after_update_to_release")
 
 
-def article_actions():
+def article_toolbar_unchanged():
     lookup("lopen")
-    expect("Bookmark", "Folders & note")
+    # The two actions the toolbar of the original app shows on a phone are still there
+    expect("Bookmark", "Full Screen")
+    if find(dump(), contains="Add a note or folders"):
+        raise AssertionError("the note bar shows for an article that is not bookmarked")
     shot("article_not_bookmarked")
+    tap_text(text="More options")
+    expect("Folders & note", "Find in page")
+    shot("article_overflow_menu")
+    back()
 
 
 def file_article_with_note():
-    tap_text(text="Folders & note")
-    wait_for(text="New folder")
+    open_article_dialog_from_menu()
     expect("No folders yet", "Save", "Cancel")
     shot("edit_dialog_no_folders_yet")
     tap_text(text="New folder")
@@ -305,12 +409,14 @@ def file_article_with_note():
     shot("article_with_note_bar")
 
 
-def bookmark_plain_and_second_folder():
+def bookmark_then_bar():
     lookup("huis")
     tap_text(text="Bookmark")
-    shot("article_plain_bookmark")
+    expect("Add a note or folders")
+    shot("article_bookmarked_bar_invites")
     lookup("fiets")
-    tap_text(text="Folders & note")
+    tap_text(text="Bookmark")
+    tap_text(text="Add a note or folders")
     wait_for(text="New folder")
     expect("Verbs")
     tap_text(text="New folder")
@@ -322,33 +428,48 @@ def bookmark_plain_and_second_folder():
     tap_text(text="Save")
     expect("Folders: Things")
     shot("article_folder_only")
+
+
+def cancelled_edit_saves_nothing():
     lookup("gezellig")
-    tap_text(text="Folders & note")
-    wait_for(text="New folder")
-    shot("edit_dialog_cancelled_nothing_saved")
+    open_article_dialog_from_menu()
+    tap(wait_for(cls="EditText"))
+    type_text("never saved")
+    shot("edit_dialog_about_to_cancel")
     tap_text(text="Cancel")
+    time.sleep(1)
+    if find(dump(), contains="never saved") or find(dump(), contains="Add a note or folders"):
+        raise AssertionError("cancelling the dialog bookmarked the article")
+    lookup("zuinig")
+    open_article_dialog_from_menu()
+    tap_text(text="Save")
+    time.sleep(1)
+    if find(dump(), contains="Add a note or folders"):
+        raise AssertionError("saving an empty dialog bookmarked the article")
 
 
 def bookmarks_tab():
     start_main()
     open_tab("Bookmarks")
-    expect("All (3)", "Things (1)", "Verbs (1)", "No folder (1)", "New folder",
-           "lopen", "huis", "fiets", "to walk, irregular past tense")
+    expect("lopen", "huis", "fiets", "to walk, irregular past tense")
+    # Filter, sort direction and sort order: the toolbar of the original app
+    expect("Filter", "Descending", "By Time")
+    expect_chips("All (3)", "Things (1)", "Verbs (1)", "No folder (1)", "New folder", "Manage folders")
     shot("bookmarks_all")
-    if find(dump(), contains="gezellig"):
-        raise AssertionError("cancelling the dialog bookmarked the article")
+    if find(dump(), contains="gezellig") or find(dump(), contains="zuinig"):
+        raise AssertionError("an article that was never saved is in the bookmarks")
 
 
 def filter_by_folder():
-    tap_text(contains="Verbs (1)")
+    tap_chip("Verbs (1)")
     wait_gone(text="huis")
     expect("lopen")
     shot("bookmarks_folder_verbs")
-    tap_text(contains="No folder (1)")
+    tap_chip("No folder (1)")
     wait_gone(text="lopen")
     expect("huis")
     shot("bookmarks_no_folder")
-    tap_text(contains="All (3)")
+    tap_chip("All (3)")
     expect("lopen", "huis", "fiets")
 
 
@@ -366,7 +487,8 @@ def file_several_at_once():
     shot("edit_dialog_two_bookmarks_verbs_indeterminate")
     tap_text(text="Things")
     tap_text(text="Save")
-    expect("Things (3)", "Verbs (1)")
+    expect_chips("All (3)", "Things (3)", "Verbs (1)", "New folder", "Manage folders")
+    expect("to walk, irregular past tense")
     shot("bookmarks_after_filing_two")
 
 
@@ -381,8 +503,7 @@ def edit_single_from_list():
 
 
 def manage_folders():
-    tap_text(text="More options")
-    tap_text(text="Manage folders")
+    tap_chip("Manage folders")
     expect("Things", "Verbs", "New folder")
     shot("manage_folders")
     tap_text(text="Verbs")
@@ -393,35 +514,35 @@ def manage_folders():
     type_text("2")
     shot("rename_prompt")
     tap_text(text="Save")
-    expect("Verbs2 (1)")
+    expect_chips("All (3)", "Things (3)", "Verbs2 (1)", "New folder", "Manage folders")
     shot("bookmarks_after_rename")
-    long_press(wait_for(contains="Things (3)"))
+    long_press(find_chip("Things (3)"))
     expect("Rename", "Delete")
     tap_text(text="Delete")
     expect("The bookmarks in it are kept")
     shot("delete_folder_confirmation")
     tap_text(text="Delete")
-    wait_gone(contains="Things (")
-    expect("All (3)", "Verbs2 (1)", "No folder (2)")
+    expect_chips("All (3)", "Verbs2 (1)", "No folder (2)", "New folder", "Manage folders")
+    expect("lopen", "huis", "fiets")
     shot("bookmarks_after_delete_folder")
 
 
-def empty_folder_and_filter_text():
-    tap_text(text="New folder")
+def empty_folder():
+    tap_chip("New folder")
     wait_for(cls="EditText")
     type_text("Empty one")
     tap_text(text="Save")
-    expect("Empty one (0)")
-    tap_text(contains="Empty one (0)")
+    expect_chips("All (3)", "Empty one (0)", "Verbs2 (1)", "No folder (2)", "New folder", "Manage folders")
+    tap_chip("Empty one (0)")
     expect("No bookmarks in this folder")
     shot("bookmarks_empty_folder")
-    tap_text(contains="All (3)")
+    tap_chip("All (3)")
     expect("lopen", "huis", "fiets")
 
 
 def article_from_bookmarks_and_removal():
     tap_text(text="lopen")
-    wait_for(text="Folders & note", timeout=60)
+    wait_for(text="Bookmark", timeout=60)
     expect("to walk, irregular past tense", "Folders: Verbs2")
     shot("article_opened_from_bookmarks")
     tap(wait_for(contains="to walk, irregular past tense"))
@@ -439,9 +560,20 @@ def restart_keeps_everything():
     shell("am force-stop " + PACKAGE)
     start_main()
     open_tab("Bookmarks")
-    expect("All (3)", "Verbs2 (1)", "Empty one (0)", "No folder (2)",
-           "lopen", "to walk, irregular past tense")
-    shot("bookmarks_after_restart")
+    expect("lopen", "huis", "fiets", "to walk, irregular past tense")
+    expect_chips("All (3)", "Empty one (0)", "Verbs2 (1)", "No folder (2)", "New folder", "Manage folders")
+    tap_chip("Verbs2 (1)")
+    wait_gone(text="huis")
+    shell("am force-stop " + PACKAGE)
+    start_main()
+    open_tab("Bookmarks")
+    # The folder that was being shown is shown again
+    expect("lopen")
+    if find(dump(), text="huis"):
+        raise AssertionError("the folder being shown was forgotten over a restart")
+    shot("bookmarks_after_restart_still_in_folder")
+    tap_chip("All (3)")
+    expect("lopen", "huis", "fiets")
 
 
 def dark_theme():
@@ -450,13 +582,13 @@ def dark_theme():
     shell("am force-stop " + PACKAGE)
     start_main()
     open_tab("Bookmarks")
-    expect("All (3)")
+    expect("lopen")
     shot("dark_bookmarks")
     tap_text(text="lopen")
-    wait_for(text="Folders & note", timeout=60)
+    wait_for(text="Bookmark", timeout=60)
     time.sleep(2)
     shot("dark_article_with_note_bar")
-    tap_text(text="Folders & note")
+    tap(wait_for(contains="to walk, irregular past tense"))
     wait_for(text="New folder")
     shot("dark_edit_dialog")
     tap_text(text="Cancel")
@@ -465,8 +597,11 @@ def dark_theme():
 
 def check_crashes():
     logcat = adb("logcat", "-d", "-v", "threadtime", timeout=120)
+    # Kept small: what the app logged, plus crashes and freezes of anything
+    keep = [line for line in logcat.splitlines()
+            if PACKAGE in line or "aard2" in line or "AndroidRuntime" in line or "ANR in" in line]
     with open(os.path.join(out_dir, "logcat.txt"), "w", encoding="utf-8") as handle:
-        handle.write(logcat)
+        handle.write("\n".join(keep) + "\n")
     # Only this app: other processes of a fresh emulator image crash on their own now and then
     crashes = [line for line in logcat.splitlines()
                if ("Process: " + PACKAGE) in line or ("ANR in " + PACKAGE) in line]
@@ -487,17 +622,18 @@ def main():
     ready = ready and step("update to the release build", lambda: update_to_release(release_apk))
     if ready:
         steps = [
-            ("article shows the new action", article_actions),
+            ("article toolbar as before, new entry in the menu", article_toolbar_unchanged),
             ("file an article under a new folder with a note", file_article_with_note),
-            ("plain bookmark, second folder, cancelled edit", bookmark_plain_and_second_folder),
+            ("bookmark, then file it from the bar under the article", bookmark_then_bar),
+            ("cancelled or empty edit saves nothing", cancelled_edit_saves_nothing),
             ("bookmarks tab lists folders, notes and counts", bookmarks_tab),
             ("pick a folder", filter_by_folder),
             ("file several bookmarks at once", file_several_at_once),
             ("edit one bookmark from the list", edit_single_from_list),
             ("rename and delete folders", manage_folders),
-            ("empty folder", empty_folder_and_filter_text),
+            ("empty folder", empty_folder),
             ("article opened from bookmarks, guarded removal", article_from_bookmarks_and_removal),
-            ("restart keeps folders and notes", restart_keeps_everything),
+            ("restart keeps folders, notes and the folder shown", restart_keeps_everything),
             ("dark theme", dark_theme),
         ]
         for name, function in steps:
