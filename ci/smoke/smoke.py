@@ -25,6 +25,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 out_dir = "smoke-out"
 shot_count = 0
 failures = []
+warnings = []
 report_lines = []
 
 
@@ -303,15 +304,17 @@ def open_article_dialog_from_menu():
 
 # ---- steps --------------------------------------------------------------------
 
-def step(name, function):
+def step(name, function, optional=False):
+    """Runs one part of the walk-through. A failing optional step is reported without
+    failing the run: it leans on screens of the system, which differ between versions."""
     log("== " + name)
     try:
         function()
         log("   ok")
         return True
     except Exception as error:
-        failures.append(name)
-        log("   FAILED: %s" % (error,))
+        (warnings if optional else failures).append(name)
+        log("   %s: %s" % ("WARNING, optional step failed" if optional else "FAILED", error))
         log(traceback.format_exc())
         shot("FAILED_" + re.sub(r"\W+", "_", name))
         return False
@@ -556,6 +559,30 @@ def article_from_bookmarks_and_removal():
     expect("to walk, irregular past tense")
 
 
+def other_lists_unchanged():
+    start_main()
+    open_tab("History")
+    expect("lopen", "huis", "fiets", "gezellig")
+    if visible_chips():
+        raise AssertionError("the history list shows a folder selector")
+    if find(dump(), contains="to walk, irregular past tense"):
+        raise AssertionError("the history list shows a bookmark note")
+    shot("history_unchanged")
+    open_tab("Lookup")
+    shot("lookup_unchanged")
+    open_tab("Bookmarks")
+    expect("lopen", "huis", "fiets")
+
+
+def filter_searches_notes():
+    tap_text(text="Filter")
+    time.sleep(1)
+    type_text("irregular")
+    wait_gone(text="huis")
+    expect("lopen", "to walk, irregular past tense")
+    shot("bookmarks_filter_matches_note")
+
+
 def restart_keeps_everything():
     shell("am force-stop " + PACKAGE)
     start_main()
@@ -595,13 +622,92 @@ def dark_theme():
     shell("cmd uimode night no", check=False)
 
 
+def scroll_down_to(text):
+    """Swipes a vertical list up until an element with the given text shows."""
+    width, height = [int(value) for value in re.search(r"(\d+)x(\d+)", shell("wm size")).groups()]
+    for _ in range(12):
+        found = find(dump(), text=text)
+        if found:
+            return found[0]
+        shell("input swipe %d %d %d %d 300" % (width // 2, int(height * 0.7), width // 2, int(height * 0.35)))
+        time.sleep(0.8)
+    raise AssertionError("no %r after scrolling; on screen: %s" % (text, texts(dump())[:40]))
+
+
+def find_ignoring_case(root, wanted):
+    return [node for node in root.iter("node") if label(node).lower() == wanted.lower()]
+
+
+def backup_round_trip():
+    """Exports the backup, deletes a bookmark with its folder, imports the file again.
+
+    The file is picked in the file picker of the system, hence an optional step."""
+    start_main()
+    open_tab("Settings")
+    tap(scroll_down_to("Export"))
+    deadline = time.time() + 30
+    while True:
+        buttons = find_ignoring_case(dump(), "save")
+        if buttons:
+            break
+        if time.time() > deadline:
+            raise AssertionError("no Save button in the file picker: %s" % texts(dump())[:40])
+        time.sleep(1)
+    shot("backup_export_file_picker")
+    tap(buttons[-1])
+    time.sleep(4)
+    found = shell("find /sdcard/ -name 'oss-dict-backup*.json' 2>/dev/null", check=False).split()
+    if not found:
+        raise AssertionError("the exported file is nowhere on shared storage")
+    backup = adb("exec-out", "cat", found[0], check=False)
+    with open(os.path.join(out_dir, "exported-backup.json"), "w", encoding="utf-8") as handle:
+        handle.write(backup)
+    for expected in ('"folders"', "Verbs2", "Empty one", "to walk, irregular past tense"):
+        if expected not in backup:
+            raise AssertionError("%s is missing from the exported backup" % expected)
+
+    start_main()
+    open_tab("Bookmarks")
+    long_press(wait_for(text="lopen"))
+    tap_text(text="Delete")
+    tap_text(text="Yes")
+    wait_gone(text="lopen")
+    long_press(find_chip("Verbs2 (0)"))
+    tap_text(text="Delete")
+    tap_text(text="Delete")
+    expect_chips("All (2)", "Empty one (0)", "New folder", "Manage folders")
+    shot("bookmarks_before_import")
+
+    open_tab("Settings")
+    tap(scroll_down_to("Import"))
+    time.sleep(3)
+    if not find(dump(), contains="oss-dict-backup"):
+        # Not among the recent files: look in the folder it was saved to
+        tap_text(text="Show roots")
+        tap_text(text="Downloads")
+    shot("backup_import_file_picker")
+    tap_text(contains="oss-dict-backup")
+    time.sleep(4)
+    start_main()
+    open_tab("Bookmarks")
+    expect("lopen", "huis", "fiets", "to walk, irregular past tense")
+    expect_chips("All (3)", "Empty one (0)", "Verbs2 (1)", "No folder (2)", "New folder", "Manage folders")
+    shot("bookmarks_after_import")
+
+
 def check_crashes():
     logcat = adb("logcat", "-d", "-v", "threadtime", timeout=120)
-    # Kept small: what the app logged, plus crashes and freezes of anything
-    keep = [line for line in logcat.splitlines()
-            if PACKAGE in line or "aard2" in line or "AndroidRuntime" in line or "ANR in" in line]
+    # Kept small: what the app's own processes logged, plus crashes and freezes of anything
+    pids = set(re.findall(r"Start proc (\d+):%s/" % re.escape(PACKAGE), logcat))
+    keep = []
+    for line in logcat.splitlines():
+        fields = line.split(None, 3)
+        from_app = len(fields) > 2 and fields[2] in pids
+        if from_app or PACKAGE in line or "AndroidRuntime" in line or "ANR in" in line:
+            keep.append(line)
     with open(os.path.join(out_dir, "logcat.txt"), "w", encoding="utf-8") as handle:
         handle.write("\n".join(keep) + "\n")
+    log("   %d log lines of the app kept, processes %s" % (len(keep), sorted(pids)))
     # Only this app: other processes of a fresh emulator image crash on their own now and then
     crashes = [line for line in logcat.splitlines()
                if ("Process: " + PACKAGE) in line or ("ANR in " + PACKAGE) in line]
@@ -633,6 +739,8 @@ def main():
             ("rename and delete folders", manage_folders),
             ("empty folder", empty_folder),
             ("article opened from bookmarks, guarded removal", article_from_bookmarks_and_removal),
+            ("history and lookup lists look as before", other_lists_unchanged),
+            ("the filter searches notes too", filter_searches_notes),
             ("restart keeps folders, notes and the folder shown", restart_keeps_everything),
             ("dark theme", dark_theme),
         ]
@@ -641,9 +749,13 @@ def main():
                 # Get back to a known place so the following steps still tell something
                 shell("am force-stop " + PACKAGE, check=False)
                 step("recover after: " + name, lambda: (start_main(), open_tab("Bookmarks")))
+        step("backup: export, delete, import", backup_round_trip, optional=True)
     step("no crash in the log", check_crashes)
 
-    log("RESULT: %s" % ("FAILED: " + "; ".join(failures) if failures else "OK"))
+    result = "FAILED: " + "; ".join(failures) if failures else "OK"
+    if warnings:
+        result += " (optional steps that failed: %s)" % "; ".join(warnings)
+    log("RESULT: " + result)
     with open(os.path.join(out_dir, "report.txt"), "w", encoding="utf-8") as handle:
         handle.write("\n".join(report_lines) + "\n")
     sys.exit(1 if failures else 0)
