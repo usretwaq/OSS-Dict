@@ -11,4 +11,8 @@
          less, to be on the safe side. -->
     <dimen name="folder_menu_title_max_width">216dp</dimen>
 
+    <!-- Space kept free above and below the folder search: little, as the keyboard already
+         takes half the screen and the folders found need the rest -->
+    <dimen name="folder_search_inset">16dp</dimen>
+
 </resources>

@@ -396,17 +396,34 @@ def expect_folder_list(wanted, picked):
         time.sleep(1)
 
 
+def search_results(root):
+    """The folders the folder search lists, top to bottom. The last one can be cut off."""
+    return [node.get("text") for node in root.iter("node")
+            if node.get("class", "").endswith("TextView") and CHIP_LABEL.match(node.get("text") or "")]
+
+
 def expect_search_results(*wanted):
     """Waits until the folder search lists exactly the given folders, top to bottom."""
     deadline = time.time() + 15
     while True:
-        found = [node.get("text") for node in dump().iter("node")
-                 if node.get("class", "").endswith("TextView") and CHIP_LABEL.match(node.get("text") or "")]
+        found = search_results(dump())
         if found == list(wanted):
             return
         if time.time() > deadline:
             raise AssertionError("the folder search lists %s, expected %s" % (found, list(wanted)))
         time.sleep(1)
+
+
+def search_field_place():
+    """Where on the screen the field of the folder search is."""
+    return wait_for(cls="EditText").get("bounds")
+
+
+def expect_search_field_at(place):
+    """The field stays where it is while the folders listed under it come and go."""
+    now = search_field_place()
+    if now != place:
+        raise AssertionError("the field of the folder search moved from %s to %s" % (place, now))
 
 
 def open_article_dialog_from_menu():
@@ -889,17 +906,22 @@ def search_folders():
                        picked="All (3)")
     shot("folder_list_with_search")
     tap_text(text="Search folders")
-    wait_for(cls="EditText")
+    field = search_field_place()
     # Nothing typed yet: every folder is listed, as many as there is room for above the keyboard
     expect("Empty one (0)", "Cancel")
     shot("folder_search_nothing_typed")
+    listed = search_results(dump())
+    if len(listed) < 5:
+        raise AssertionError("the folder search has room for %s only" % listed)
     type_text("q")
     expect("No folder with that name")
+    expect_search_field_at(field)
     shot("folder_search_nothing_found")
     shell("input keyevent KEYCODE_DEL")
     time.sleep(0.8)
     type_text("week")
     expect_search_results(*MORE_CHIPS)
+    expect_search_field_at(field)
     shot("folder_search_several_found")
     # Other capitals, and two words that are found apart from each other
     for _ in range(4):
@@ -907,6 +929,7 @@ def search_folders():
     time.sleep(0.8)
     type_text("WE 3")
     expect_search_results("Week 3 (0)")
+    expect_search_field_at(field)
     shot("folder_search_one_found")
     tap_text(text="Week 3 (0)")
     folder_list_closed()

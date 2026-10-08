@@ -4,6 +4,7 @@ import android.content.Context;
 import android.net.Uri;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -292,7 +293,8 @@ public final class BookmarkFolderDialogs {
     /**
      * Finds a folder by part of its name, for when there are too many to look through. The
      * folders listed narrow down while the user types, see {@link BookmarkFolders#search};
-     * picking one closes the dialog.
+     * picking one closes the dialog. It sits at the top of the screen and takes the height
+     * left above the keyboard, to show as many folders as it can.
      */
     @MainThread
     public static void showSearchDialog(@NonNull Context context, @NonNull OnFolderPicked onFolderPicked) {
@@ -317,9 +319,11 @@ public final class BookmarkFolderDialogs {
         };
         list.setAdapter(found);
         list.setEmptyView(content.findViewById(R.id.folder_search_empty));
-        AlertDialog dialog = builder.setTitle(R.string.folders_search)
-                .setView(content)
+        int inset = context.getResources().getDimensionPixelSize(R.dimen.folder_search_inset);
+        AlertDialog dialog = builder.setView(content)
                 .setNegativeButton(R.string.action_cancel, null)
+                .setBackgroundInsetTop(inset)
+                .setBackgroundInsetBottom(inset)
                 .create();
         list.setOnItemClickListener((parent, view, position, id) -> {
             String name = found.getItem(position);
@@ -343,10 +347,14 @@ public final class BookmarkFolderDialogs {
                 found.addAll(BookmarkFolders.search(names, text.toString()));
             }
         });
-        // Typing is what this dialog is for: bring up the keyboard right away
         Window window = dialog.getWindow();
         if (window != null) {
-            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+            // At the top, so that the field stays where it is while the list under it grows
+            // and shrinks. Typing is what this dialog is for: the keyboard comes up right
+            // away, and the dialog keeps to the room above it.
+            window.setGravity(Gravity.TOP);
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         }
         input.requestFocus();
         dialog.show();
