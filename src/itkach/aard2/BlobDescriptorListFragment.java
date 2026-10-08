@@ -166,8 +166,8 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         Map<String, Integer> counts = list.getFolderCounts();
         int total = list.getTotalCount();
         int unfiled = list.getUnfiledCount();
-        // "No folder" only helps once folders exist; without any it would repeat "All"
-        boolean offerUnfiled = showsUnfiled || (!names.isEmpty() && unfiled > 0);
+        // "No folder" only helps to tell entries apart: with every entry in it, it repeats "All"
+        boolean offerUnfiled = showsUnfiled || (unfiled > 0 && unfiled < total);
 
         StringBuilder content = new StringBuilder().append(total).append('/')
                 .append(offerUnfiled ? unfiled : -1);
