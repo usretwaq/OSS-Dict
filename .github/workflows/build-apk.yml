@@ -121,6 +121,47 @@ jobs:
             commit -q -m "Logs of failed build ${GITHUB_RUN_NUMBER} (${GITHUB_SHA})"
           git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-logs
 
+  # Lint holds nothing up: build.gradle turns abortOnError off, as the original app comes
+  # with findings of its own. Its report is kept on the ci-lint branch, to be read there.
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Lint
+        run: ./gradlew --no-daemon lint 2>&1 | tee build-lint.log
+
+      - name: Keep the lint report
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/ci-lint
+          cp build-lint.log build/reports/lint-results-debug.txt build/reports/lint-results-debug.xml \
+            /tmp/ci-lint/ 2>/dev/null || true
+          cd /tmp/ci-lint
+          echo "run ${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT} commit ${GITHUB_SHA}" > RUN.txt
+          git init -q
+          git checkout -q -b ci-lint
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
+            commit -q -m "Lint report of build ${GITHUB_RUN_NUMBER} (${GITHUB_SHA})"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-lint
+
   # Installs the built APKs on an emulator and walks through folders and notes the way a
   # person would, see ci/smoke/smoke.py. Screenshots of every step end up on the ci-smoke
   # branch, whether the run passed or not.

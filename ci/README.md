@@ -15,6 +15,12 @@ The screenshots and the texts on screen after each step are pushed to the `ci-sm
 branch, the logs of a build that failed to the `ci-logs` branch. Both branches hold the
 last run only.
 
+## Lint
+
+Lint runs next to the build and holds nothing up: its report is pushed to the `ci-lint`
+branch (last run only), to be read there. The original app has findings of its own, so
+what counts is what a change adds to them.
+
 ## Signing key
 
 `personal-build.keystore` (password `ossdict-plus`, alias `ossdictplus`) signs those APKs.
