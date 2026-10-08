@@ -152,9 +152,14 @@ def shot(name):
 
 # ---- acting on the screen -----------------------------------------------------
 
-def center(node):
-    left, top, right, bottom = [int(value) for value in re.match(
+def bounds(node):
+    """Left, top, right and bottom of what shows of the element on screen."""
+    return [int(value) for value in re.match(
         r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]", node.get("bounds")).groups()]
+
+
+def center(node):
+    left, top, right, bottom = bounds(node)
     return (left + right) // 2, (top + bottom) // 2
 
 
@@ -226,6 +231,12 @@ def at_start(labels):
     return bool(labels) and labels[0].startswith("All (")
 
 
+def row_at_start():
+    """Whether the row is scrolled all the way back: "All" shows, and shows in full."""
+    chips = visible_chips()
+    return bool(chips) and at_start([chips[0].get("text")]) and bounds(chips[0])[0] > 0
+
+
 def at_end(labels):
     # "Manage folders" closes the row once folders exist, "New folder" before that
     return "Manage folders" in labels or (len(labels) == 2 and labels[1] == "New folder")
@@ -263,21 +274,21 @@ def all_chips():
         labels = chip_labels()
         collected += [item for item in labels if item not in collected]
     for _ in range(8):
-        if at_start(chip_labels()):
+        if row_at_start():
             break
         scroll_chips(forward=False)
     return collected
 
 
 def expect_chips(*wanted):
-    deadline = time.time() + 20
-    while True:
+    # A number of tries rather than a time limit: going through a long row takes a while
+    labels = []
+    for _ in range(4):
         labels = all_chips()
         if labels == list(wanted):
             return
-        if time.time() > deadline:
-            raise AssertionError("folder selector shows %s, expected %s" % (labels, list(wanted)))
         time.sleep(1)
+    raise AssertionError("folder selector shows %s, expected %s" % (labels, list(wanted)))
 
 
 def find_chip(label):
@@ -296,6 +307,16 @@ def find_chip(label):
 
 def tap_chip(label):
     tap(find_chip(label))
+
+
+def chip_in_full_view(label):
+    """Whether the entry shows in full: one cut off by the edge of the screen ends there."""
+    width = int(re.search(r"(\d+)x\d+", shell("wm size")).group(1))
+    for node in visible_chips():
+        if node.get("text") == label:
+            left, _, right, _ = bounds(node)
+            return left > 0 and right < width
+    return False
 
 
 def open_article_dialog_from_menu():
@@ -665,6 +686,46 @@ def restart_keeps_everything():
     expect("lopen", "huis", "fiets")
 
 
+# Wide enough to push the folders after them out of sight
+LONG_FOLDERS = ["Long folder name to fill the row A", "Long folder name to fill the row B"]
+LONG_CHIPS = [name + " (0)" for name in LONG_FOLDERS]
+
+
+def shown_folder_comes_into_view():
+    """With more folders than fit the screen, the selector scrolls to the one being shown."""
+    for name in LONG_FOLDERS:
+        tap_chip("New folder")
+        wait_for(cls="EditText")
+        type_text(name)
+        tap_text(text="Save")
+        wait_gone(text="Cancel")
+    expect_chips("All (3)", "Empty one (0)", LONG_CHIPS[0], LONG_CHIPS[1], "Verbs2 (1)",
+                 "No folder (2)", "New folder", "Manage folders")
+    if visible_chips() and chip_in_full_view("Verbs2 (1)"):
+        raise AssertionError("the row is not long enough to hide a folder: this proves nothing")
+    shot("bookmarks_many_folders")
+    tap_chip("Verbs2 (1)")
+    wait_gone(text="huis")
+    time.sleep(1.5)
+    if not chip_in_full_view("Verbs2 (1)"):
+        raise AssertionError("the folder picked is cut off, the selector did not scroll to it")
+    shell("am force-stop " + PACKAGE)
+    start_main()
+    open_tab("Bookmarks")
+    expect("lopen")
+    time.sleep(2)
+    shot("bookmarks_shown_folder_in_view_after_restart")
+    if find(dump(), text="huis"):
+        raise AssertionError("the folder being shown was forgotten over a restart")
+    if not chip_in_full_view("Verbs2 (1)"):
+        raise AssertionError("after a restart the folder being shown is out of sight: %s" % chip_labels())
+    tap_chip("All (3)")
+    expect("lopen", "huis", "fiets")
+    time.sleep(1.5)
+    if not chip_in_full_view("All (3)"):
+        raise AssertionError("the selector did not scroll back to All: %s" % chip_labels())
+
+
 def dark_theme():
     shell("cmd uimode night yes", check=False)
     time.sleep(2)
@@ -724,7 +785,7 @@ def backup_round_trip():
     backup = adb("exec-out", "cat", found[0], check=False)
     with open(os.path.join(out_dir, "exported-backup.json"), "w", encoding="utf-8") as handle:
         handle.write(backup)
-    for expected in ('"folders"', "Verbs2", "Empty one", "to walk, irregular past tense"):
+    for expected in ('"folders"', "Verbs2", "Empty one", LONG_FOLDERS[1], "to walk, irregular past tense"):
         if expected not in backup:
             raise AssertionError("%s is missing from the exported backup" % expected)
 
@@ -737,7 +798,7 @@ def backup_round_trip():
     long_press(find_chip("Verbs2 (0)"))
     tap_text(text="Delete")
     tap_text(text="Delete")
-    expect_chips("All (2)", "Empty one (0)", "New folder", "Manage folders")
+    expect_chips("All (2)", "Empty one (0)", LONG_CHIPS[0], LONG_CHIPS[1], "New folder", "Manage folders")
     shot("bookmarks_before_import")
 
     open_tab("Settings")
@@ -754,7 +815,8 @@ def backup_round_trip():
     start_main()
     open_tab("Bookmarks")
     expect("lopen", "huis", "fiets", "to walk, irregular past tense")
-    expect_chips("All (3)", "Empty one (0)", "Verbs2 (1)", "No folder (2)", "New folder", "Manage folders")
+    expect_chips("All (3)", "Empty one (0)", LONG_CHIPS[0], LONG_CHIPS[1], "Verbs2 (1)",
+                 "No folder (2)", "New folder", "Manage folders")
     shot("bookmarks_after_import")
 
 
@@ -807,6 +869,7 @@ def main():
             ("history and lookup lists look as before", other_lists_unchanged),
             ("the filter searches notes too", filter_searches_notes),
             ("restart keeps folders, notes and the folder shown", restart_keeps_everything),
+            ("the folder shown is scrolled into view", shown_folder_comes_into_view),
             ("dark theme", dark_theme),
         ]
         for name, function in steps:

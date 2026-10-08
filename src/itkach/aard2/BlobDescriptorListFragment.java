@@ -11,6 +11,7 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.HorizontalScrollView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -55,9 +56,17 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
 
     @Nullable
     private ChipGroup folderChips;
+    @Nullable
+    private HorizontalScrollView folderBar;
     /** What the folder selector currently lists, to rebuild it only when that changes. */
     @Nullable
     private String folderChipsContent;
+    /** Tag of the folder selector entry ticked last, to bring it into view when it changes. */
+    @Nullable
+    private Object folderChipShown;
+    /** Tag of the entry still to bring into view, once the selector knows where it sits. */
+    @Nullable
+    private Object folderChipToReveal;
     private final DataSetObserver folderObserver = new DataSetObserver() {
         @Override
         public void onChanged() {
@@ -104,7 +113,11 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         if (supportsFolders()) {
             descriptorList.setFolderFilter(p.getString(PREF_FOLDER, null));
             folderChips = view.findViewById(R.id.folder_chips);
-            view.findViewById(R.id.folder_bar).setVisibility(View.VISIBLE);
+            folderBar = view.findViewById(R.id.folder_bar);
+            folderBar.setVisibility(View.VISIBLE);
+            folderChips.addOnLayoutChangeListener((chips, left, top, right, bottom,
+                                                   oldLeft, oldTop, oldRight, oldBottom) ->
+                    chips.post(this::revealShownFolder));
             descriptorList.registerDataSetObserver(folderObserver);
             refreshFolderSelector();
         }
@@ -142,7 +155,10 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         if (folderChips != null) {
             getDescriptorList().unregisterDataSetObserver(folderObserver);
             folderChips = null;
+            folderBar = null;
             folderChipsContent = null;
+            folderChipShown = null;
+            folderChipToReveal = null;
         }
         super.onDestroyView();
     }
@@ -212,6 +228,13 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
                 ((Chip) child).setChecked(true);
             }
         }
+        if (!shownTag.equals(folderChipShown)) {
+            // After a restart or a rename the ticked entry can be out of sight further along
+            // the row, and a list narrowed to a folder with no folder ticked looks broken
+            folderChipShown = shownTag;
+            folderChipToReveal = shownTag;
+            folderChips.post(this::revealShownFolder);
+        }
 
         // The folder being shown can change without a tap here: renamed, deleted
         SharedPreferences.Editor editor = prefs().edit();
@@ -225,6 +248,38 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         TextView emptyText = emptyView.findViewById(R.id.empty_text);
         emptyText.setText(shown == null || showsUnfiled
                 ? getEmptyText() : getString(R.string.folders_empty_folder));
+    }
+
+    /**
+     * Scrolls the folder selector as little as it takes to show the entry of the folder
+     * being shown in full. Does nothing until the entries have been laid out: it is tried
+     * again after every layout of the selector.
+     */
+    private void revealShownFolder() {
+        ChipGroup chips = folderChips;
+        HorizontalScrollView bar = folderBar;
+        Object tag = folderChipToReveal;
+        if (chips == null || bar == null || tag == null) {
+            return;
+        }
+        for (int index = 0; index < chips.getChildCount(); index++) {
+            View chip = chips.getChildAt(index);
+            if (!tag.equals(chip.getTag())) {
+                continue;
+            }
+            if (!chip.isLaidOut() || chip.isLayoutRequested()) {
+                return;
+            }
+            folderChipToReveal = null;
+            int left = chips.getLeft() + chip.getLeft() - bar.getPaddingLeft();
+            int right = chips.getLeft() + chip.getRight() + bar.getPaddingRight();
+            if (left < bar.getScrollX()) {
+                bar.smoothScrollTo(left, 0);
+            } else if (right > bar.getScrollX() + bar.getWidth()) {
+                bar.smoothScrollTo(right - bar.getWidth(), 0);
+            }
+            return;
+        }
     }
 
     /**
