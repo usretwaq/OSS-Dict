@@ -3,6 +3,7 @@ package itkach.aard2;
 import android.content.Context;
 import android.net.Uri;
 import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -172,7 +173,7 @@ public final class BookmarkFolderDialogs {
                     noFoldersLabel.setVisibility(View.GONE);
                 }));
 
-        builder.setTitle(title)
+        AlertDialog editDialog = builder.setTitle(title)
                 .setView(content)
                 .setPositiveButton(R.string.action_save, (dialog, which) -> {
                     Set<String> addFolders = new LinkedHashSet<>();
@@ -203,7 +204,25 @@ public final class BookmarkFolderDialogs {
                         SlobHelper.getInstance().bookmarks.notifyDataSetChanged();
                     }
                 })
-                .show();
+                .create();
+        if (withNote) {
+            noteInput.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence text, int start, int count, int after) {
+                }
+
+                @Override
+                public void onTextChanged(CharSequence text, int start, int before, int count) {
+                }
+
+                @Override
+                public void afterTextChanged(Editable text) {
+                    // A note being typed is not lost to a stray tap next to the dialog
+                    editDialog.setCanceledOnTouchOutside(false);
+                }
+            });
+        }
+        editDialog.show();
     }
 
     /**

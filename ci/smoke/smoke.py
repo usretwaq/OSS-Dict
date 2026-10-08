@@ -561,6 +561,40 @@ def article_from_bookmarks_and_removal():
     expect("to walk, irregular past tense")
 
 
+def tap_beside_dialog():
+    """Taps the dimmed part of the screen above a dialog."""
+    width = int(re.search(r"(\d+)x\d+", shell("wm size")).group(1))
+    shell("input tap %d 180" % (width // 2))
+    time.sleep(1.0)
+
+
+def edit_note_of_article_from_list():
+    """Still on "lopen", opened out of the bookmark list: saving changes the very list the
+    pages of this screen come from."""
+    tap(wait_for(contains="to walk, irregular past tense"))
+    wait_for(text="New folder")
+    # Nothing typed yet: a tap next to the dialog closes it, as for any other dialog
+    tap_beside_dialog()
+    wait_gone(text="New folder")
+    tap(wait_for(contains="to walk, irregular past tense"))
+    wait_for(text="New folder")
+    tap(wait_for(cls="EditText"))
+    shell("input keyevent KEYCODE_MOVE_END")
+    type_text(" liep")
+    # With text typed, the same tap must not throw it away
+    tap_beside_dialog()
+    if not find(dump(), text="New folder"):
+        raise AssertionError("a tap next to the dialog closed it while a note was being typed")
+    shot("edit_dialog_survives_tap_outside")
+    tap_text(text="Save")
+    expect("to walk, irregular past tense liep", "Folders: Verbs2")
+    wait_for(text="Bookmark")
+    shot("article_from_list_after_saving_note")
+    back()
+    expect("lopen", "huis", "fiets", "to walk, irregular past tense liep")
+    expect("Filter", "By Time")
+
+
 def other_lists_unchanged():
     start_main()
     open_tab("History")
@@ -741,6 +775,7 @@ def main():
             ("rename and delete folders", manage_folders),
             ("empty folder", empty_folder),
             ("article opened from bookmarks, guarded removal", article_from_bookmarks_and_removal),
+            ("edit the note of an article opened from the list", edit_note_of_article_from_list),
             ("history and lookup lists look as before", other_lists_unchanged),
             ("the filter searches notes too", filter_searches_notes),
             ("restart keeps folders, notes and the folder shown", restart_keeps_everything),
