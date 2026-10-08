@@ -2,13 +2,16 @@ package itkach.aard2;
 
 import android.app.Activity;
 import android.content.SharedPreferences;
+import android.database.DataSetObserver;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.util.SparseBooleanArray;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -18,7 +21,16 @@ import androidx.appcompat.view.ActionMode;
 import androidx.appcompat.widget.SearchView;
 import androidx.core.content.ContextCompat;
 
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import itkach.aard2.descriptor.BlobDescriptor;
+import itkach.aard2.utils.ThreadUtils;
 
 
 abstract class BlobDescriptorListFragment extends BaseListFragment implements ActionMode.Callback {
@@ -34,8 +46,25 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
 
     private final static String PREF_SORT_ORDER = "sortOrder";
     private final static String PREF_SORT_DIRECTION = "sortDir";
+    private final static String PREF_FOLDER = "folder";
+
+    /** Tag of the folder selector entry that shows the entries of every folder. */
+    private static final Object ALL_FOLDERS = new Object();
 
     private MenuItem miFilter = null;
+
+    @Nullable
+    private ChipGroup folderChips;
+    /** What the folder selector currently lists, to rebuild it only when that changes. */
+    @Nullable
+    private String folderChipsContent;
+    private final DataSetObserver folderObserver = new DataSetObserver() {
+        @Override
+        public void onChanged() {
+            // Posted, as the list adapter does: the list also changes from background threads
+            ThreadUtils.postOnMainThread(BlobDescriptorListFragment.this::refreshFolderSelector);
+        }
+    };
 
     abstract BlobDescriptorList getDescriptorList();
 
@@ -44,6 +73,11 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
     abstract int getDeleteConfirmationItemCountResId();
 
     abstract String getPreferencesNS();
+
+    /** Whether the entries of this list can be filed under folders and carry a note. */
+    boolean supportsFolders() {
+        return false;
+    }
 
     @NonNull
     private SharedPreferences prefs() {
@@ -66,6 +100,14 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         boolean sortDir = p.getBoolean(PREF_SORT_DIRECTION, false);
 
         descriptorList.setSort(sortOrder, sortDir);
+
+        if (supportsFolders()) {
+            descriptorList.setFolderFilter(p.getString(PREF_FOLDER, null));
+            folderChips = view.findViewById(R.id.folder_chips);
+            view.findViewById(R.id.folder_bar).setVisibility(View.VISIBLE);
+            descriptorList.registerDataSetObserver(folderObserver);
+            refreshFolderSelector();
+        }
 
         listAdapter = new BlobDescriptorListAdapter(descriptorList, getItemClickAction());
         listAdapter.setOnSelectionStartedListener(new BlobDescriptorListAdapter.OnSelectionChangeListener() {
@@ -93,6 +135,122 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         icArrowDown = ContextCompat.getDrawable(activity, R.drawable.ic_sort_descending);
 
         recyclerView.setAdapter(listAdapter);
+    }
+
+    @Override
+    public void onDestroyView() {
+        if (folderChips != null) {
+            getDescriptorList().unregisterDataSetObserver(folderObserver);
+            folderChips = null;
+            folderChipsContent = null;
+        }
+        super.onDestroyView();
+    }
+
+    /**
+     * Brings the folder selector in line with the folders that exist, the number of
+     * entries in each and the folder being shown. Runs after every change of the list.
+     */
+    private void refreshFolderSelector() {
+        if (folderChips == null || getContext() == null) {
+            return;
+        }
+        BlobDescriptorList list = getDescriptorList();
+        String shown = list.getFolderFilter();
+        boolean showsUnfiled = BlobDescriptorList.FOLDER_UNFILED.equals(shown);
+        List<String> names = BookmarkFolderDialogs.getAllFolderNames();
+        if (shown != null && !showsUnfiled && !names.contains(shown)) {
+            // Never hide the folder being shown, even if nothing else knows it any more
+            names.add(shown);
+        }
+        Map<String, Integer> counts = list.getFolderCounts();
+        int total = list.getTotalCount();
+        int unfiled = list.getUnfiledCount();
+        // "No folder" only helps once folders exist; without any it would repeat "All"
+        boolean offerUnfiled = showsUnfiled || (!names.isEmpty() && unfiled > 0);
+
+        StringBuilder content = new StringBuilder().append(total).append('/')
+                .append(offerUnfiled ? unfiled : -1);
+        for (String name : names) {
+            content.append('\n').append(name).append('\t').append(counts.get(name));
+        }
+        if (!content.toString().equals(folderChipsContent)) {
+            folderChipsContent = content.toString();
+            folderChips.removeAllViews();
+            addFolderChip(ALL_FOLDERS, getString(R.string.folders_all), total);
+            for (String name : names) {
+                Integer count = counts.get(name);
+                addFolderChip(name, name, count == null ? 0 : count);
+            }
+            if (offerUnfiled) {
+                addFolderChip(BlobDescriptorList.FOLDER_UNFILED, getString(R.string.folders_unfiled), unfiled);
+            }
+            Chip newFolderChip = new Chip(folderChips.getContext());
+            newFolderChip.setText(R.string.folders_new);
+            newFolderChip.setChipIconResource(R.drawable.ic_add);
+            newFolderChip.setChipIconVisible(true);
+            newFolderChip.setCheckable(false);
+            newFolderChip.setOnClickListener(view -> BookmarkFolderDialogs.promptNewFolder(requireActivity()));
+            folderChips.addView(newFolderChip);
+        }
+
+        // Ticking the entry of the folder being shown unticks the others: single selection
+        Object shownTag = shown == null ? ALL_FOLDERS : shown;
+        for (int index = 0; index < folderChips.getChildCount(); index++) {
+            View child = folderChips.getChildAt(index);
+            if (child instanceof Chip && shownTag.equals(child.getTag())) {
+                ((Chip) child).setChecked(true);
+            }
+        }
+
+        // The folder being shown can change without a tap here: renamed, deleted
+        SharedPreferences.Editor editor = prefs().edit();
+        if (shown == null) {
+            editor.remove(PREF_FOLDER);
+        } else {
+            editor.putString(PREF_FOLDER, shown);
+        }
+        editor.apply();
+
+        TextView emptyText = emptyView.findViewById(R.id.empty_text);
+        emptyText.setText(shown == null || showsUnfiled
+                ? getEmptyText() : getString(R.string.folders_empty_folder));
+    }
+
+    /**
+     * @param folder what tapping the entry shows: a folder name, {@link #ALL_FOLDERS} or
+     *               {@link BlobDescriptorList#FOLDER_UNFILED}
+     */
+    private void addFolderChip(@NonNull Object folder, @NonNull String label, int count) {
+        if (folderChips == null) {
+            return;
+        }
+        Chip chip = (Chip) LayoutInflater.from(folderChips.getContext())
+                .inflate(R.layout.folder_chip, folderChips, false);
+        chip.setText(getString(R.string.folders_chip_label, label, count));
+        chip.setTag(folder);
+        chip.setOnClickListener(view ->
+                getDescriptorList().setFolderFilter(folder == ALL_FOLDERS ? null : (String) folder));
+        boolean isUserFolder = folder != ALL_FOLDERS && !BlobDescriptorList.FOLDER_UNFILED.equals(folder);
+        if (isUserFolder) {
+            chip.setOnLongClickListener(view -> {
+                BookmarkFolderDialogs.showFolderActions(requireActivity(), (String) folder);
+                return true;
+            });
+        }
+        folderChips.addView(chip);
+    }
+
+    private List<BlobDescriptor> getSelectedItems() {
+        List<BlobDescriptor> selected = new ArrayList<>();
+        SparseBooleanArray checkedItems = listAdapter.getCheckedItemPositions();
+        for (int index = 0; index < checkedItems.size(); index++) {
+            int position = checkedItems.keyAt(index);
+            if (checkedItems.valueAt(index) && position >= 0 && position < listAdapter.getItemCount()) {
+                selected.add(listAdapter.getItem(position));
+            }
+        }
+        return selected;
     }
 
     protected void deleteSelectedItems() {
@@ -145,6 +303,7 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         });
         setSortOrder(menu.findItem(R.id.action_sort_order), list.getSortOrder());
         setAscending(menu.findItem(R.id.action_sort_asc), list.isAscending());
+        menu.findItem(R.id.action_manage_folders).setVisible(supportsFolders());
 
         super.onPrepareOptionsMenu(menu);
     }
@@ -203,6 +362,10 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
             setSortOrder(mi, list.getSortOrder());
             return true;
         }
+        if (itemId == R.id.action_manage_folders) {
+            BookmarkFolderDialogs.showManageDialog(requireActivity());
+            return true;
+        }
         return super.onOptionsItemSelected(mi);
     }
 
@@ -220,6 +383,7 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         actionMode = mode;
         if (mode != null) {
             mode.getMenuInflater().inflate(R.menu.blob_descriptor_selection, menu);
+            menu.findItem(R.id.blob_descriptor_folders).setVisible(supportsFolders());
         }
         listAdapter.setSelectionMode(true);
         return true;
@@ -250,6 +414,9 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
                     .create();
             deleteConfirmationDialog.setOnDismissListener(dialogInterface -> deleteConfirmationDialog = null);
             deleteConfirmationDialog.show();
+            return true;
+        } else if (itemId == R.id.blob_descriptor_folders) {
+            BookmarkFolderDialogs.editBookmarks(requireActivity(), getSelectedItems(), mode::finish);
             return true;
         } else if (itemId == R.id.blob_descriptor_select_all) {
             listAdapter.selectAll();

@@ -8,6 +8,7 @@ import androidx.annotation.Nullable;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -65,6 +66,19 @@ public class BlobDescriptor extends BaseDescriptor {
 
     @JsonProperty("fragment")
     public String fragment;
+
+    /**
+     * Names of the folders a bookmark is filed under, empty when it is in none. Only
+     * bookmarks use it, history entries leave it empty. Edits replace the list instead of
+     * changing it in place (see {@link BookmarkFolders}), so a copy taken for a backup stays
+     * stable while it is written on another thread.
+     */
+    @JsonProperty("folders")
+    public List<String> folders = new ArrayList<>();
+
+    /** Free text the user attached to a bookmark, null when there is none. */
+    @JsonProperty("note")
+    public String note;
 
     @Nullable
     public static BlobDescriptor fromUri(@NonNull Uri uri) {

@@ -37,6 +37,7 @@ import itkach.aard2.dictionary.DictionaryEntry;
 import itkach.aard2.dictionary.SlobDictionary;
 import itkach.aard2.lookup.LookupResult;
 import itkach.aard2.prefs.AppPrefs;
+import itkach.aard2.prefs.BookmarkFolderPrefs;
 import itkach.aard2.slob.SlobServer;
 import itkach.slob.Slob;
 
@@ -230,13 +231,17 @@ public final class SlobHelper {
 
     /**
      * Copies the current bookmarks and history so a backup can be written off the main thread
-     * without racing with list updates.
+     * without racing with list updates. The bookmark folder names go along, so that folders
+     * nothing is filed under yet are part of the backup too.
      */
     @MainThread
     @NonNull
     public BlobDescriptorBackup.Content snapshotForBackup() {
+        Set<String> folders = BookmarkFolderPrefs.getNames();
+        folders.addAll(bookmarks.getFolderNames());
         return new BlobDescriptorBackup.Content(
-                new ArrayList<>(bookmarks.getList()), new ArrayList<>(history.getList()));
+                new ArrayList<>(bookmarks.getList()), new ArrayList<>(history.getList()),
+                new ArrayList<>(folders));
     }
 
     /** Writes a snapshot taken by {@link #snapshotForBackup()} as a backup document. */
@@ -244,7 +249,7 @@ public final class SlobHelper {
     public void writeBackup(@NonNull OutputStream out, @NonNull BlobDescriptorBackup.Content content)
             throws IOException {
         BlobDescriptorBackup.write(out, mapper, content.bookmarks, content.history,
-                System.currentTimeMillis());
+                content.folders, System.currentTimeMillis());
     }
 
     /**

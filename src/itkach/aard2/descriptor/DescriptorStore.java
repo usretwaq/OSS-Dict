@@ -7,6 +7,7 @@ import androidx.annotation.Nullable;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.File;
@@ -75,6 +76,8 @@ public class DescriptorStore<T extends BaseDescriptor> {
                 d.blobId = getText(root, "blobId");
                 d.key = getText(root, "key");
                 d.fragment = getText(root, "fragment");
+                d.note = getText(root, "note");
+                d.folders = getTextList(root, "folders");
                 if (d.id == null || d.id.isEmpty()) {
                     d.id = f.getName();
                 }
@@ -140,6 +143,21 @@ public class DescriptorStore<T extends BaseDescriptor> {
         return value.asText(null);
     }
 
+    @NonNull
+    private static List<String> getTextList(@NonNull JsonNode node, @NonNull String key) {
+        List<String> result = new ArrayList<>();
+        JsonNode values = node.get(key);
+        if (values != null && values.isArray()) {
+            for (JsonNode value : values) {
+                String text = value == null || value.isNull() ? null : value.asText(null);
+                if (text != null && !text.isEmpty()) {
+                    result.add(text);
+                }
+            }
+        }
+        return result;
+    }
+
     private static long getLong(@NonNull JsonNode node, @NonNull String key, long defaultValue) {
         JsonNode value = node.get(key);
         return value == null || value.isNull() ? defaultValue : value.asLong(defaultValue);
@@ -174,6 +192,15 @@ public class DescriptorStore<T extends BaseDescriptor> {
                 root.put("blobId", d.blobId);
                 root.put("key", d.key);
                 root.put("fragment", d.fragment);
+                root.put("note", d.note);
+                ArrayNode folders = root.putArray("folders");
+                if (d.folders != null) {
+                    for (String folder : d.folders) {
+                        if (folder != null && !folder.isEmpty()) {
+                            folders.add(folder);
+                        }
+                    }
+                }
                 mapper.writeValue(out, root);
             } else if (item instanceof SlobDescriptor) {
                 SlobDescriptor d = (SlobDescriptor) item;

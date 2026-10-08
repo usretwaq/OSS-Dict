@@ -28,6 +28,10 @@ import java.util.UUID;
  * <p>Entries are written with the same field names {@link DescriptorStore} persists, so a
  * descriptor round-trips through a backup without any translation layer. The Jackson tree
  * API is used rather than data binding, mirroring {@code DescriptorStore.save}.</p>
+ *
+ * <p>Bookmark folders and notes travel inside each bookmark entry. The list of folder names
+ * is written as well, so that a folder with nothing in it yet survives the move. All of these
+ * are optional when reading: a file written before they existed stays readable.</p>
  */
 public final class BlobDescriptorBackup {
 
@@ -42,6 +46,7 @@ public final class BlobDescriptorBackup {
     private static final String PROP_EXPORTED_AT = "exportedAt";
     private static final String PROP_BOOKMARKS = "bookmarks";
     private static final String PROP_HISTORY = "history";
+    private static final String PROP_FOLDERS = "folders";
 
     /** Parsed backup file content. */
     public static final class Content {
@@ -49,10 +54,19 @@ public final class BlobDescriptorBackup {
         public final List<BlobDescriptor> bookmarks;
         @NonNull
         public final List<BlobDescriptor> history;
+        /** Names of the bookmark folders, including the ones no bookmark is filed under. */
+        @NonNull
+        public final List<String> folders;
 
         public Content(@NonNull List<BlobDescriptor> bookmarks, @NonNull List<BlobDescriptor> history) {
+            this(bookmarks, history, new ArrayList<>());
+        }
+
+        public Content(@NonNull List<BlobDescriptor> bookmarks, @NonNull List<BlobDescriptor> history,
+                       @NonNull List<String> folders) {
             this.bookmarks = bookmarks;
             this.history = history;
+            this.folders = folders;
         }
     }
 
@@ -68,10 +82,25 @@ public final class BlobDescriptorBackup {
                              @NonNull List<BlobDescriptor> bookmarks,
                              @NonNull List<BlobDescriptor> history,
                              long exportedAt) throws IOException {
+        write(out, mapper, bookmarks, history, new ArrayList<>(), exportedAt);
+    }
+
+    /**
+     * Writes both lists and the bookmark folder names as a single backup document.
+     *
+     * @param folders    every bookmark folder name, so that empty folders are kept too
+     * @param exportedAt timestamp stored in the file, passed in so callers (and tests) control it
+     */
+    public static void write(@NonNull OutputStream out, @NonNull ObjectMapper mapper,
+                             @NonNull List<BlobDescriptor> bookmarks,
+                             @NonNull List<BlobDescriptor> history,
+                             @NonNull List<String> folders,
+                             long exportedAt) throws IOException {
         ObjectNode root = mapper.createObjectNode();
         root.put(PROP_FORMAT, FORMAT);
         root.put(PROP_VERSION, VERSION);
         root.put(PROP_EXPORTED_AT, exportedAt);
+        root.set(PROP_FOLDERS, toTextArray(mapper, folders));
         root.set(PROP_BOOKMARKS, toArray(mapper, bookmarks));
         root.set(PROP_HISTORY, toArray(mapper, history));
         mapper.writeValue(out, root);
@@ -100,7 +129,8 @@ public final class BlobDescriptorBackup {
         if (version < 1 || version > VERSION) {
             throw new IOException("Unsupported backup version: " + version);
         }
-        return new Content(toDescriptors(root.get(PROP_BOOKMARKS)), toDescriptors(root.get(PROP_HISTORY)));
+        return new Content(toDescriptors(root.get(PROP_BOOKMARKS)), toDescriptors(root.get(PROP_HISTORY)),
+                toTextList(root.get(PROP_FOLDERS)));
     }
 
     /**
@@ -139,23 +169,51 @@ public final class BlobDescriptorBackup {
     }
 
     /**
+     * Brings the folders and notes of {@code imported} onto the entries of {@code existing}
+     * that {@link #selectNew} skips as already present, so that importing a backup does not
+     * silently drop them. What is already stored wins, see {@link BookmarkFolders#mergeInto}.
+     *
+     * @return the entries of {@code existing} that changed and need to be persisted
+     */
+    @NonNull
+    public static List<BlobDescriptor> mergeAnnotations(@NonNull List<BlobDescriptor> existing,
+                                                        @NonNull List<BlobDescriptor> imported) {
+        List<BlobDescriptor> changed = new ArrayList<>();
+        for (BlobDescriptor candidate : imported) {
+            if (candidate == null) {
+                continue;
+            }
+            BlobDescriptor stored = find(existing, candidate);
+            if (stored != null && BookmarkFolders.mergeInto(stored, candidate) && !changed.contains(stored)) {
+                changed.add(stored);
+            }
+        }
+        return changed;
+    }
+
+    private static boolean contains(@NonNull List<BlobDescriptor> list, @NonNull BlobDescriptor candidate) {
+        return find(list, candidate) != null;
+    }
+
+    /**
      * Same rule as {@code BlobDescriptorList.contains}: an exact descriptor match, or the same
      * key in the same dictionary (the descriptor was recreated after the dictionary changed).
      */
-    private static boolean contains(@NonNull List<BlobDescriptor> list, @NonNull BlobDescriptor candidate) {
+    @Nullable
+    private static BlobDescriptor find(@NonNull List<BlobDescriptor> list, @NonNull BlobDescriptor candidate) {
         for (BlobDescriptor descriptor : list) {
             if (descriptor == null) {
                 continue;
             }
             if (descriptor.equals(candidate)) {
-                return true;
+                return descriptor;
             }
             if (Objects.equals(descriptor.key, candidate.key)
                     && Objects.equals(descriptor.slobUri, candidate.slobUri)) {
-                return true;
+                return descriptor;
             }
         }
-        return false;
+        return null;
     }
 
     @NonNull
@@ -174,9 +232,38 @@ public final class BlobDescriptorBackup {
             node.put("blobId", descriptor.blobId);
             node.put("key", descriptor.key);
             node.put("fragment", descriptor.fragment);
+            node.put("note", descriptor.note);
+            node.set("folders", toTextArray(mapper,
+                    descriptor.folders == null ? new ArrayList<>() : descriptor.folders));
             array.add(node);
         }
         return array;
+    }
+
+    @NonNull
+    private static ArrayNode toTextArray(@NonNull ObjectMapper mapper, @NonNull List<String> values) {
+        ArrayNode array = mapper.createArrayNode();
+        for (String value : values) {
+            if (!isEmpty(value)) {
+                array.add(value);
+            }
+        }
+        return array;
+    }
+
+    @NonNull
+    private static List<String> toTextList(@Nullable JsonNode array) {
+        List<String> result = new ArrayList<>();
+        if (array == null || !array.isArray()) {
+            return result;
+        }
+        for (JsonNode node : array) {
+            String value = node == null || node.isNull() ? null : node.asText(null);
+            if (!isEmpty(value) && !result.contains(value)) {
+                result.add(value);
+            }
+        }
+        return result;
     }
 
     @NonNull
@@ -198,6 +285,8 @@ public final class BlobDescriptorBackup {
             descriptor.blobId = getText(node, "blobId");
             descriptor.key = getText(node, "key");
             descriptor.fragment = getText(node, "fragment");
+            descriptor.note = getText(node, "note");
+            descriptor.folders = toTextList(node.get("folders"));
             if (isEmpty(descriptor.slobId) || isEmpty(descriptor.key)) {
                 continue;
             }

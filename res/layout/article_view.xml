@@ -1,23 +1,69 @@
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:orientation="vertical">
 
-    <itkach.aard2.widget.ArticleWebView
-        android:id="@+id/webView"
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone"
-    />
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
-    <com.google.android.material.progressindicator.LinearProgressIndicator
-        android:id="@+id/progress_horizontal"
+        <itkach.aard2.widget.ArticleWebView
+            android:id="@+id/webView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone"
+        />
+
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/progress_horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top"
+            android:maxHeight="6dp"
+            android:minHeight="6dp"
+            android:padding="0dp"
+            android:indeterminate="false"
+            android:max="100" />
+    </FrameLayout>
+
+    <!-- The user's note and folders for this article; tap to edit. Shown only when there are any. -->
+    <androidx.appcompat.widget.LinearLayoutCompat
+        android:id="@+id/article_note_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="top"
-        android:maxHeight="6dp"
-        android:minHeight="6dp"
-        android:padding="0dp"
-        android:indeterminate="false"
-        android:max="100" />
-</FrameLayout>
+        android:background="?attr/colorSecondaryContainer"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackground"
+        android:orientation="vertical"
+        android:paddingStart="16dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="10dp"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/article_note_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="4"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSecondaryContainer"
+            tools:text="to walk; irregular: liep, gelopen" />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/article_note_folders"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textAppearance="?attr/textAppearanceLabelMedium"
+            android:textColor="?attr/colorOnSecondaryContainer"
+            tools:text="Verbs · Week 1" />
+    </androidx.appcompat.widget.LinearLayoutCompat>
+</LinearLayout>

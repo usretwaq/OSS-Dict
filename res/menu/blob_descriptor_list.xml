@@ -15,5 +15,9 @@
         android:id="@+id/action_sort_order"
         android:title="@string/action_descending"
         app:showAsAction="ifRoom" />
+    <item
+        android:id="@+id/action_manage_folders"
+        android:title="@string/action_manage_folders"
+        app:showAsAction="never" />
 
 </menu>

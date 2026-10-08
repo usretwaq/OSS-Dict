@@ -1,4 +1,12 @@
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Bookmarks only, hidden for the history list -->
+    <item
+        android:id="@+id/blob_descriptor_folders"
+        android:icon="@drawable/ic_edit_note"
+        android:title="@string/action_bookmark_folders"
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/blob_descriptor_select_all"
