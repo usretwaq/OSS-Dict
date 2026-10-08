@@ -216,7 +216,9 @@ def open_tab(name):
 
 # ---- the folder selector above the bookmark list: a row that scrolls sideways ---
 
-CHIP_LABEL = re.compile(r"^(.+ \(\d+\)|New folder|Manage folders)$")
+CHIP_LABEL = re.compile(r"^(.+ \(\d+\)|New folder)$")
+# Name of the button next to the row, which stays put and lists the folders top to bottom
+FOLDER_LIST = "Folder list"
 
 
 def visible_chips():
@@ -238,8 +240,8 @@ def row_at_start():
 
 
 def at_end(labels):
-    # "Manage folders" closes the row once folders exist, "New folder" before that
-    return "Manage folders" in labels or (len(labels) == 2 and labels[1] == "New folder")
+    # "New folder" closes the row
+    return "New folder" in labels
 
 
 def scroll_chips(forward):
@@ -310,13 +312,83 @@ def tap_chip(label):
 
 
 def chip_in_full_view(label):
-    """Whether the entry shows in full: one cut off by the edge of the screen ends there."""
-    width = int(re.search(r"(\d+)x\d+", shell("wm size")).group(1))
-    for node in visible_chips():
+    """Whether the entry shows in full: one cut off by an edge of the row ends there. The
+    row does not reach the edge of the screen, the button listing the folders follows it."""
+    root = dump()
+    rows = [node for node in root.iter("node")
+            if node.get("resource-id", "").endswith(":id/folder_scroll")]
+    rows = rows or find(root, cls="HorizontalScrollView")
+    if not rows:
+        raise AssertionError("no folder row on screen: %s" % texts(root)[:40])
+    row_left, _, row_right, _ = bounds(rows[0])
+    for node in root.iter("node"):
         if node.get("text") == label:
             left, _, right, _ = bounds(node)
-            return left > 0 and right < width
+            return left > row_left and right < row_right
     return False
+
+
+def expect_picked_chip(label):
+    """Waits until the given entry of the row, and no other one on screen, shows as picked."""
+    deadline = time.time() + 15
+    while True:
+        picked = [node.get("text") for node in visible_chips() if node.get("checked") == "true"]
+        if picked == [label]:
+            return
+        if time.time() > deadline:
+            raise AssertionError("picked in the folder row: %s, expected %s" % (picked, [label]))
+        time.sleep(1)
+
+
+# ---- the list of the folders that drops down from the button next to the row -------
+
+def open_folder_list():
+    tap_text(text=FOLDER_LIST)
+    # The menu is the only list of this kind: the lists of the screen behind it are others
+    wait_for(cls="ListView")
+
+
+def folder_list_closed():
+    """Waits until the screen behind the list of folders is in front again."""
+    wait_for(text=FOLDER_LIST)
+
+
+def folder_list_entries(root):
+    """What the open list of folders offers, top to bottom."""
+    return [node.get("text") for node in root.iter("node")
+            if node.get("class", "").endswith("TextView") and node.get("text")]
+
+
+def picked_in_folder_list(root):
+    """The entries of the open list of folders that carry a ticked radio button."""
+    parents = {child: parent for parent in root.iter() for child in parent}
+    picked = []
+    for node in root.iter("node"):
+        if not node.get("class", "").endswith("RadioButton") or node.get("checked") != "true":
+            continue
+        # The label is not part of the button, it sits next to it in the same row
+        holder = parents.get(node)
+        while holder is not None:
+            labels = folder_list_entries(holder)
+            if labels:
+                picked.append(labels[0])
+                break
+            holder = parents.get(holder)
+    return picked
+
+
+def expect_folder_list(wanted, picked):
+    """Checks the open list of folders: its entries in order, and the one that is ticked."""
+    deadline = time.time() + 15
+    while True:
+        root = dump()
+        found = folder_list_entries(root), picked_in_folder_list(root)
+        if found == (list(wanted), [picked]):
+            return
+        if time.time() > deadline:
+            raise AssertionError("the folder list shows %s with %s ticked, expected %s with %s ticked"
+                                 % (found[0], found[1], list(wanted), [picked]))
+        time.sleep(1)
 
 
 def open_article_dialog_from_menu():
@@ -480,7 +552,8 @@ def bookmarks_tab():
     expect("lopen", "huis", "fiets", "to walk, irregular past tense")
     # Filter, sort direction and sort order: the toolbar of the original app
     expect("Filter", "Descending", "By Time")
-    expect_chips("All (3)", "Things (1)", "Verbs (1)", "No folder (1)", "New folder", "Manage folders")
+    expect_chips("All (3)", "Things (1)", "Verbs (1)", "No folder (1)", "New folder")
+    wait_for(text=FOLDER_LIST)
     shot("bookmarks_all")
     if find(dump(), contains="gezellig") or find(dump(), contains="zuinig"):
         raise AssertionError("an article that was never saved is in the bookmarks")
@@ -499,6 +572,38 @@ def filter_by_folder():
     expect("lopen", "huis", "fiets")
 
 
+def folder_list():
+    """The button next to the row lists the same entries top to bottom: pick from there."""
+    entries = ["All (3)", "Things (1)", "Verbs (1)", "No folder (1)", "New folder", "Manage folders"]
+    open_folder_list()
+    expect_folder_list(entries, picked="All (3)")
+    shot("folder_list")
+    tap_text(text="Verbs (1)")
+    folder_list_closed()
+    wait_gone(text="huis")
+    expect("lopen")
+    expect_picked_chip("Verbs (1)")
+    open_folder_list()
+    expect_folder_list(entries, picked="Verbs (1)")
+    shot("folder_list_folder_picked")
+    tap_text(text="No folder (1)")
+    folder_list_closed()
+    wait_gone(text="lopen")
+    expect("huis")
+    expect_picked_chip("No folder (1)")
+    # Leaving the list with Back changes nothing
+    open_folder_list()
+    back()
+    folder_list_closed()
+    expect("huis")
+    expect_picked_chip("No folder (1)")
+    open_folder_list()
+    tap_text(text="All (3)")
+    folder_list_closed()
+    expect("lopen", "huis", "fiets")
+    expect_picked_chip("All (3)")
+
+
 def file_several_at_once():
     long_press(wait_for(text="lopen"))
     wait_for(text="Folders & note")
@@ -513,7 +618,7 @@ def file_several_at_once():
     shot("edit_dialog_two_bookmarks_verbs_indeterminate")
     tap_text(text="Things")
     tap_text(text="Save")
-    expect_chips("All (3)", "Things (3)", "Verbs (1)", "New folder", "Manage folders")
+    expect_chips("All (3)", "Things (3)", "Verbs (1)", "New folder")
     expect("to walk, irregular past tense")
     shot("bookmarks_after_filing_two")
 
@@ -529,8 +634,10 @@ def edit_single_from_list():
 
 
 def manage_folders():
-    tap_chip("Manage folders")
-    expect("Things", "Verbs", "New folder")
+    open_folder_list()
+    tap_text(text="Manage folders")
+    # "Cancel" tells the dialog from the list it is opened from, which names the folders too
+    expect("Things", "Verbs", "New folder", "Cancel")
     shot("manage_folders")
     tap_text(text="Verbs")
     expect("Rename", "Delete")
@@ -540,7 +647,7 @@ def manage_folders():
     type_text("2")
     shot("rename_prompt")
     tap_text(text="Save")
-    expect_chips("All (3)", "Things (3)", "Verbs2 (1)", "New folder", "Manage folders")
+    expect_chips("All (3)", "Things (3)", "Verbs2 (1)", "New folder")
     shot("bookmarks_after_rename")
     long_press(find_chip("Things (3)"))
     expect("Rename", "Delete")
@@ -548,7 +655,7 @@ def manage_folders():
     expect("The bookmarks in it are kept")
     shot("delete_folder_confirmation")
     tap_text(text="Delete")
-    expect_chips("All (3)", "Verbs2 (1)", "No folder (2)", "New folder", "Manage folders")
+    expect_chips("All (3)", "Verbs2 (1)", "No folder (2)", "New folder")
     expect("lopen", "huis", "fiets")
     shot("bookmarks_after_delete_folder")
 
@@ -558,7 +665,7 @@ def empty_folder():
     wait_for(cls="EditText")
     type_text("Empty one")
     tap_text(text="Save")
-    expect_chips("All (3)", "Empty one (0)", "Verbs2 (1)", "No folder (2)", "New folder", "Manage folders")
+    expect_chips("All (3)", "Empty one (0)", "Verbs2 (1)", "No folder (2)", "New folder")
     tap_chip("Empty one (0)")
     expect("No bookmarks in this folder")
     shot("bookmarks_empty_folder")
@@ -629,7 +736,7 @@ def leave_shown_folder_from_article():
     shot("edit_dialog_leaving_the_folder_shown")
     tap_text(text="Save")
     expect("No bookmarks in this folder")
-    expect_chips("All (3)", "Empty one (0)", "Verbs2 (0)", "New folder", "Manage folders")
+    expect_chips("All (3)", "Empty one (0)", "Verbs2 (0)", "New folder")
     shot("bookmarks_folder_emptied_from_article")
     # Back into the folder, for the steps that follow
     tap_chip("All (3)")
@@ -638,7 +745,7 @@ def leave_shown_folder_from_article():
     wait_for(text="New folder")
     tap_text(text="Verbs2", cls="CheckBox")
     tap_text(text="Save")
-    expect_chips("All (3)", "Empty one (0)", "Verbs2 (1)", "No folder (2)", "New folder", "Manage folders")
+    expect_chips("All (3)", "Empty one (0)", "Verbs2 (1)", "No folder (2)", "New folder")
     expect("lopen", "huis", "fiets", "to walk, irregular past tense liep")
 
 
@@ -646,7 +753,7 @@ def other_lists_unchanged():
     start_main()
     open_tab("History")
     expect("lopen", "huis", "fiets", "gezellig")
-    if visible_chips():
+    if visible_chips() or find(dump(), text=FOLDER_LIST):
         raise AssertionError("the history list shows a folder selector")
     if find(dump(), contains="to walk, irregular past tense"):
         raise AssertionError("the history list shows a bookmark note")
@@ -671,7 +778,7 @@ def restart_keeps_everything():
     start_main()
     open_tab("Bookmarks")
     expect("lopen", "huis", "fiets", "to walk, irregular past tense")
-    expect_chips("All (3)", "Empty one (0)", "Verbs2 (1)", "No folder (2)", "New folder", "Manage folders")
+    expect_chips("All (3)", "Empty one (0)", "Verbs2 (1)", "No folder (2)", "New folder")
     tap_chip("Verbs2 (1)")
     wait_gone(text="huis")
     shell("am force-stop " + PACKAGE)
@@ -692,21 +799,34 @@ LONG_CHIPS = [name + " (0)" for name in LONG_FOLDERS]
 
 
 def shown_folder_comes_into_view():
-    """With more folders than fit the screen, the selector scrolls to the one being shown."""
-    for name in LONG_FOLDERS:
-        tap_chip("New folder")
-        wait_for(cls="EditText")
-        type_text(name)
-        tap_text(text="Save")
-        wait_gone(text="Cancel")
+    """With more folders than fit the screen, the list of folders is the way to one that is
+    out of sight, and the row scrolls to the folder being shown."""
+    tap_chip("New folder")
+    wait_for(cls="EditText")
+    type_text(LONG_FOLDERS[0])
+    tap_text(text="Save")
+    wait_gone(text="Cancel")
+    # The second one from the list of folders, which offers the same
+    open_folder_list()
+    tap_text(text="New folder")
+    wait_for(cls="EditText")
+    type_text(LONG_FOLDERS[1])
+    tap_text(text="Save")
+    wait_gone(text="Cancel")
     expect_chips("All (3)", "Empty one (0)", LONG_CHIPS[0], LONG_CHIPS[1], "Verbs2 (1)",
-                 "No folder (2)", "New folder", "Manage folders")
+                 "No folder (2)", "New folder")
     if visible_chips() and chip_in_full_view("Verbs2 (1)"):
         raise AssertionError("the row is not long enough to hide a folder: this proves nothing")
     shot("bookmarks_many_folders")
-    tap_chip("Verbs2 (1)")
+    open_folder_list()
+    expect_folder_list(["All (3)", "Empty one (0)", LONG_CHIPS[0], LONG_CHIPS[1], "Verbs2 (1)",
+                        "No folder (2)", "New folder", "Manage folders"], picked="All (3)")
+    shot("folder_list_many_folders")
+    tap_text(text="Verbs2 (1)")
+    folder_list_closed()
     wait_gone(text="huis")
     time.sleep(1.5)
+    shot("bookmarks_folder_picked_from_list")
     if not chip_in_full_view("Verbs2 (1)"):
         raise AssertionError("the folder picked is cut off, the selector did not scroll to it")
     shell("am force-stop " + PACKAGE)
@@ -719,7 +839,9 @@ def shown_folder_comes_into_view():
         raise AssertionError("the folder being shown was forgotten over a restart")
     if not chip_in_full_view("Verbs2 (1)"):
         raise AssertionError("after a restart the folder being shown is out of sight: %s" % chip_labels())
-    tap_chip("All (3)")
+    open_folder_list()
+    tap_text(text="All (3)")
+    folder_list_closed()
     expect("lopen", "huis", "fiets")
     time.sleep(1.5)
     if not chip_in_full_view("All (3)"):
@@ -734,6 +856,10 @@ def dark_theme():
     open_tab("Bookmarks")
     expect("lopen")
     shot("dark_bookmarks")
+    open_folder_list()
+    shot("dark_folder_list")
+    back()
+    folder_list_closed()
     tap_text(text="lopen")
     wait_for(text="Bookmark", timeout=60)
     time.sleep(2)
@@ -798,7 +924,7 @@ def backup_round_trip():
     long_press(find_chip("Verbs2 (0)"))
     tap_text(text="Delete")
     tap_text(text="Delete")
-    expect_chips("All (2)", "Empty one (0)", LONG_CHIPS[0], LONG_CHIPS[1], "New folder", "Manage folders")
+    expect_chips("All (2)", "Empty one (0)", LONG_CHIPS[0], LONG_CHIPS[1], "New folder")
     shot("bookmarks_before_import")
 
     open_tab("Settings")
@@ -816,7 +942,7 @@ def backup_round_trip():
     open_tab("Bookmarks")
     expect("lopen", "huis", "fiets", "to walk, irregular past tense")
     expect_chips("All (3)", "Empty one (0)", LONG_CHIPS[0], LONG_CHIPS[1], "Verbs2 (1)",
-                 "No folder (2)", "New folder", "Manage folders")
+                 "No folder (2)", "New folder")
     shot("bookmarks_after_import")
 
 
@@ -859,6 +985,7 @@ def main():
             ("cancelled or empty edit saves nothing", cancelled_edit_saves_nothing),
             ("bookmarks tab lists folders, notes and counts", bookmarks_tab),
             ("pick a folder", filter_by_folder),
+            ("pick a folder from the list of folders", folder_list),
             ("file several bookmarks at once", file_several_at_once),
             ("edit one bookmark from the list", edit_single_from_list),
             ("rename and delete folders", manage_folders),

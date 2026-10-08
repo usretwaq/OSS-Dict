@@ -18,24 +18,52 @@
         android:visibility="gone"/>
 
     <!-- Folder selector, shown only above the bookmark list -->
-    <HorizontalScrollView
+    <LinearLayout
         android:id="@+id/folder_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:clipToPadding="false"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
-        android:scrollbars="none"
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:visibility="gone">
 
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/folder_chips"
+        <HorizontalScrollView
+            android:id="@+id/folder_scroll"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:scrollbars="none">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/folder_chips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:selectionRequired="true"
+                app:singleLine="true"
+                app:singleSelection="true" />
+        </HorizontalScrollView>
+
+        <!-- Stays put while the row scrolls and lists the folders top to bottom. Only an
+             icon: the paddings make it 48dp wide, the width of a comfortable target. -->
+        <com.google.android.material.chip.Chip
+            android:id="@+id/folder_menu"
+            style="@style/Widget.Material3.Chip.Assist"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:selectionRequired="true"
-            app:singleLine="true"
-            app:singleSelection="true" />
-    </HorizontalScrollView>
+            android:layout_marginEnd="8dp"
+            android:contentDescription="@string/folders_list"
+            app:chipEndPadding="12dp"
+            app:chipIcon="@drawable/ic_keyboard_arrow_down"
+            app:chipIconSize="24dp"
+            app:chipStartPadding="12dp"
+            app:iconEndPadding="0dp"
+            app:iconStartPadding="0dp"
+            app:textEndPadding="0dp"
+            app:textStartPadding="0dp" />
+    </LinearLayout>
 
     <itkach.aard2.widget.RecyclerView
         android:id="@+id/recycler_view"

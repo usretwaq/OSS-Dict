@@ -6,6 +6,7 @@ import android.database.DataSetObserver;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.util.SparseBooleanArray;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -19,8 +20,11 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.view.ActionMode;
+import androidx.appcompat.widget.PopupMenu;
 import androidx.appcompat.widget.SearchView;
+import androidx.appcompat.widget.TooltipCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.MenuCompat;
 
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
@@ -52,12 +56,36 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
     /** Tag of the folder selector entry that shows the entries of every folder. */
     private static final Object ALL_FOLDERS = new Object();
 
+    /** Groups of the folder list menu: the folders to pick from, then what to do with them. */
+    private static final int MENU_GROUP_FOLDERS = 1;
+    private static final int MENU_GROUP_ACTIONS = 2;
+
+    /** One entry of the folder selector: what picking it shows, and how it is labelled. */
+    private static final class FolderEntry {
+        /** A folder name, {@link #ALL_FOLDERS} or {@link BlobDescriptorList#FOLDER_UNFILED}. */
+        @NonNull
+        final Object tag;
+        /** The name with the number of entries, as shown to the user. */
+        @NonNull
+        final String label;
+
+        FolderEntry(@NonNull Object tag, @NonNull String label) {
+            this.tag = tag;
+            this.label = label;
+        }
+
+        /** Whether this is a folder made by the user, which can be renamed and deleted. */
+        boolean isUserFolder() {
+            return tag != ALL_FOLDERS && !BlobDescriptorList.FOLDER_UNFILED.equals(tag);
+        }
+    }
+
     private MenuItem miFilter = null;
 
     @Nullable
     private ChipGroup folderChips;
     @Nullable
-    private HorizontalScrollView folderBar;
+    private HorizontalScrollView folderScroll;
     /** What the folder selector currently lists, to rebuild it only when that changes. */
     @Nullable
     private String folderChipsContent;
@@ -113,8 +141,12 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         if (supportsFolders()) {
             descriptorList.setFolderFilter(p.getString(PREF_FOLDER, null));
             folderChips = view.findViewById(R.id.folder_chips);
-            folderBar = view.findViewById(R.id.folder_bar);
-            folderBar.setVisibility(View.VISIBLE);
+            folderScroll = view.findViewById(R.id.folder_scroll);
+            view.findViewById(R.id.folder_bar).setVisibility(View.VISIBLE);
+            View folderMenu = view.findViewById(R.id.folder_menu);
+            // Only an icon: its name shows on a long press
+            TooltipCompat.setTooltipText(folderMenu, folderMenu.getContentDescription());
+            folderMenu.setOnClickListener(this::showFolderMenu);
             folderChips.addOnLayoutChangeListener((chips, left, top, right, bottom,
                                                    oldLeft, oldTop, oldRight, oldBottom) ->
                     chips.post(this::revealShownFolder));
@@ -155,7 +187,7 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         if (folderChips != null) {
             getDescriptorList().unregisterDataSetObserver(folderObserver);
             folderChips = null;
-            folderBar = null;
+            folderScroll = null;
             folderChipsContent = null;
             folderChipShown = null;
             folderChipToReveal = null;
@@ -171,35 +203,20 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         if (folderChips == null || getContext() == null) {
             return;
         }
-        BlobDescriptorList list = getDescriptorList();
-        String shown = list.getFolderFilter();
+        String shown = getDescriptorList().getFolderFilter();
         boolean showsUnfiled = BlobDescriptorList.FOLDER_UNFILED.equals(shown);
-        List<String> names = BookmarkFolderDialogs.getAllFolderNames();
-        if (shown != null && !showsUnfiled && !names.contains(shown)) {
-            // Never hide the folder being shown, even if nothing else knows it any more
-            names.add(shown);
-        }
-        Map<String, Integer> counts = list.getFolderCounts();
-        int total = list.getTotalCount();
-        int unfiled = list.getUnfiledCount();
-        // "No folder" only helps to tell entries apart: with every entry in it, it repeats "All"
-        boolean offerUnfiled = showsUnfiled || (unfiled > 0 && unfiled < total);
+        List<FolderEntry> entries = getFolderEntries();
 
-        StringBuilder content = new StringBuilder().append(total).append('/')
-                .append(offerUnfiled ? unfiled : -1);
-        for (String name : names) {
-            content.append('\n').append(name).append('\t').append(counts.get(name));
+        StringBuilder content = new StringBuilder();
+        for (FolderEntry entry : entries) {
+            // Not the label alone: a folder can be called like one of the two fixed entries
+            content.append(entry.isUserFolder()).append('\t').append(entry.label).append('\n');
         }
         if (!content.toString().equals(folderChipsContent)) {
             folderChipsContent = content.toString();
             folderChips.removeAllViews();
-            addFolderChip(ALL_FOLDERS, getString(R.string.folders_all), total);
-            for (String name : names) {
-                Integer count = counts.get(name);
-                addFolderChip(name, name, count == null ? 0 : count);
-            }
-            if (offerUnfiled) {
-                addFolderChip(BlobDescriptorList.FOLDER_UNFILED, getString(R.string.folders_unfiled), unfiled);
+            for (FolderEntry entry : entries) {
+                addFolderChip(entry);
             }
             Chip newFolderChip = new Chip(folderChips.getContext());
             newFolderChip.setText(R.string.folders_new);
@@ -208,16 +225,6 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
             newFolderChip.setCheckable(false);
             newFolderChip.setOnClickListener(view -> BookmarkFolderDialogs.promptNewFolder(requireActivity()));
             folderChips.addView(newFolderChip);
-            if (!names.isEmpty()) {
-                // Renaming and deleting, also offered by a long press on a folder
-                Chip manageChip = new Chip(folderChips.getContext());
-                manageChip.setText(R.string.folders_manage);
-                manageChip.setChipIconResource(R.drawable.ic_edit);
-                manageChip.setChipIconVisible(true);
-                manageChip.setCheckable(false);
-                manageChip.setOnClickListener(view -> BookmarkFolderDialogs.showManageDialog(requireActivity()));
-                folderChips.addView(manageChip);
-            }
         }
 
         // Ticking the entry of the folder being shown unticks the others: single selection
@@ -257,7 +264,7 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
      */
     private void revealShownFolder() {
         ChipGroup chips = folderChips;
-        HorizontalScrollView bar = folderBar;
+        HorizontalScrollView bar = folderScroll;
         Object tag = folderChipToReveal;
         if (chips == null || bar == null || tag == null) {
             return;
@@ -283,27 +290,110 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
     }
 
     /**
-     * @param folder what tapping the entry shows: a folder name, {@link #ALL_FOLDERS} or
-     *               {@link BlobDescriptorList#FOLDER_UNFILED}
+     * What the folder selector offers, in the order it is listed: all the entries, every
+     * folder, then the entries in no folder.
      */
-    private void addFolderChip(@NonNull Object folder, @NonNull String label, int count) {
+    @NonNull
+    private List<FolderEntry> getFolderEntries() {
+        BlobDescriptorList list = getDescriptorList();
+        String shown = list.getFolderFilter();
+        boolean showsUnfiled = BlobDescriptorList.FOLDER_UNFILED.equals(shown);
+        List<String> names = BookmarkFolderDialogs.getAllFolderNames();
+        if (shown != null && !showsUnfiled && !names.contains(shown)) {
+            // Never hide the folder being shown, even if nothing else knows it any more
+            names.add(shown);
+        }
+        Map<String, Integer> counts = list.getFolderCounts();
+        int total = list.getTotalCount();
+        int unfiled = list.getUnfiledCount();
+
+        List<FolderEntry> entries = new ArrayList<>();
+        entries.add(new FolderEntry(ALL_FOLDERS, getFolderLabel(getString(R.string.folders_all), total)));
+        for (String name : names) {
+            Integer count = counts.get(name);
+            entries.add(new FolderEntry(name, getFolderLabel(name, count == null ? 0 : count)));
+        }
+        // "No folder" only helps to tell entries apart: with every entry in it, it repeats "All"
+        if (showsUnfiled || (unfiled > 0 && unfiled < total)) {
+            entries.add(new FolderEntry(BlobDescriptorList.FOLDER_UNFILED,
+                    getFolderLabel(getString(R.string.folders_unfiled), unfiled)));
+        }
+        return entries;
+    }
+
+    @NonNull
+    private String getFolderLabel(@NonNull String name, int count) {
+        return getString(R.string.folders_chip_label, name, count);
+    }
+
+    private void showFolder(@NonNull FolderEntry entry) {
+        getDescriptorList().setFolderFilter(entry.tag == ALL_FOLDERS ? null : (String) entry.tag);
+    }
+
+    private void addFolderChip(@NonNull FolderEntry entry) {
         if (folderChips == null) {
             return;
         }
         Chip chip = (Chip) LayoutInflater.from(folderChips.getContext())
                 .inflate(R.layout.folder_chip, folderChips, false);
-        chip.setText(getString(R.string.folders_chip_label, label, count));
-        chip.setTag(folder);
-        chip.setOnClickListener(view ->
-                getDescriptorList().setFolderFilter(folder == ALL_FOLDERS ? null : (String) folder));
-        boolean isUserFolder = folder != ALL_FOLDERS && !BlobDescriptorList.FOLDER_UNFILED.equals(folder);
-        if (isUserFolder) {
+        chip.setText(entry.label);
+        chip.setTag(entry.tag);
+        chip.setOnClickListener(view -> showFolder(entry));
+        if (entry.isUserFolder()) {
             chip.setOnLongClickListener(view -> {
-                BookmarkFolderDialogs.showFolderActions(requireActivity(), (String) folder);
+                BookmarkFolderDialogs.showFolderActions(requireActivity(), (String) entry.tag);
                 return true;
             });
         }
         folderChips.addView(chip);
+    }
+
+    /**
+     * Lists the folder selector top to bottom, in a menu dropping down from the given view:
+     * the short way to a folder that is far along the row. The menu ends with creating a
+     * folder and managing the folders, which keeps them at hand however long the row is.
+     */
+    private void showFolderMenu(@NonNull View anchor) {
+        String shown = getDescriptorList().getFolderFilter();
+        Object shownTag = shown == null ? ALL_FOLDERS : shown;
+        // The context of the activity: the one of the anchor carries the colours of a chip
+        PopupMenu popup = new PopupMenu(requireActivity(), anchor, Gravity.END);
+        Menu menu = popup.getMenu();
+        MenuItem shownItem = null;
+        boolean hasUserFolders = false;
+        for (FolderEntry entry : getFolderEntries()) {
+            MenuItem item = menu.add(MENU_GROUP_FOLDERS, Menu.NONE, Menu.NONE, entry.label);
+            item.setOnMenuItemClickListener(picked -> {
+                showFolder(entry);
+                return true;
+            });
+            if (shownTag.equals(entry.tag)) {
+                shownItem = item;
+            }
+            if (entry.isUserFolder()) {
+                hasUserFolders = true;
+            }
+        }
+        // Exclusive: the entries get a radio button, ticked for the folder being shown
+        menu.setGroupCheckable(MENU_GROUP_FOLDERS, true, true);
+        if (shownItem != null) {
+            shownItem.setChecked(true);
+        }
+        menu.add(MENU_GROUP_ACTIONS, Menu.NONE, Menu.NONE, R.string.folders_new)
+                .setOnMenuItemClickListener(picked -> {
+                    BookmarkFolderDialogs.promptNewFolder(requireActivity());
+                    return true;
+                });
+        if (hasUserFolders) {
+            // Renaming and deleting, also offered by a long press on a folder of the row
+            menu.add(MENU_GROUP_ACTIONS, Menu.NONE, Menu.NONE, R.string.folders_manage)
+                    .setOnMenuItemClickListener(picked -> {
+                        BookmarkFolderDialogs.showManageDialog(requireActivity());
+                        return true;
+                    });
+        }
+        MenuCompat.setGroupDividerEnabled(menu, true);
+        popup.show();
     }
 
     private List<BlobDescriptor> getSelectedItems() {

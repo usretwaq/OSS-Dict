@@ -88,12 +88,15 @@ menu opens the same dialog, and bookmarks the article when a note or
 a folder is saved for it.
 
 In Bookmarks tab, the row above the list picks the folder to show:
-all bookmarks, one folder, or the ones in no folder. "New folder"
-creates a folder; a long tap on a folder, or "Manage folders",
-renames or deletes it. Deleting a folder keeps its bookmarks. To file
-several bookmarks at once, long tap to select them and tap the
-"Folders & note" icon. Each bookmark lists its folders and note, and
-the filter searches notes as well as titles.
+all bookmarks, one folder, or the ones in no folder. The button at
+the end of the row stays in place and lists the same folders top to
+bottom, which is quicker than scrolling once there are many. "New
+folder" creates a folder; a long tap on a folder, or "Manage
+folders" in that list, renames or deletes it. Deleting a folder
+keeps its bookmarks. To file several bookmarks at once, long tap to
+select them and tap the "Folders & note" icon. Each bookmark lists
+its folders and note, and the filter searches notes as well as
+titles.
 
 Folders and notes are part of the backup file (Settings, Backup).
 
