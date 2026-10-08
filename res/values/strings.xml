@@ -264,7 +264,7 @@
 
     <!-- Bookmark folders and notes -->
     <string name="action_bookmark_folders">Folders &amp; note</string>
-    <string name="action_manage_folders">Manage folders</string>
+    <string name="folders_manage">Manage folders</string>
     <string name="folders_title">Folders</string>
     <string name="folders_all">All</string>
     <string name="folders_unfiled">No folder</string>
@@ -277,6 +277,7 @@
     <string name="folders_confirm_delete">Delete the folder \"%1$s\"? The bookmarks in it are kept.</string>
     <string name="folders_empty_folder">No bookmarks in this folder</string>
     <string name="bookmark_note_hint">Note</string>
+    <string name="bookmark_add_note_hint">Add a note or folders</string>
     <string name="bookmark_folders_label">Folders: %1$s</string>
     <string name="bookmark_confirm_remove">Remove this bookmark? Its note and folders will be lost.</string>
 </resources>

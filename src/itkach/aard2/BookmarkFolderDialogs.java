@@ -249,7 +249,7 @@ public final class BookmarkFolderDialogs {
     public static void showManageDialog(@NonNull Context context) {
         List<String> names = getAllFolderNames();
         MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context)
-                .setTitle(R.string.action_manage_folders)
+                .setTitle(R.string.folders_manage)
                 .setPositiveButton(R.string.folders_new, (dialog, which) -> promptNewFolder(context))
                 .setNegativeButton(R.string.action_cancel, null);
         if (names.isEmpty()) {

@@ -46,7 +46,7 @@ public class ArticleFragment extends Fragment {
     private MenuItem bookmarkMenu;
     private MenuItem stylesMenu;
     private Uri url;
-    // Bar under the article showing the note and folders of its bookmark
+    // Bar under a bookmarked article: its note and folders, or an invitation to add them
     private View noteBar;
     private TextView noteText;
     private TextView noteFolders;
@@ -108,14 +108,20 @@ public class ArticleFragment extends Fragment {
         if (noteBar == null) {
             return;
         }
-        boolean hasNote = bookmark != null && !TextUtils.isEmpty(bookmark.note);
-        boolean hasFolders = bookmark != null && !BookmarkFolders.isUnfiled(bookmark);
-        noteText.setVisibility(hasNote ? View.VISIBLE : View.GONE);
-        noteText.setText(hasNote ? bookmark.note : null);
+        noteBar.setVisibility(bookmark != null ? View.VISIBLE : View.GONE);
+        if (bookmark == null) {
+            return;
+        }
+        boolean hasNote = !TextUtils.isEmpty(bookmark.note);
+        boolean hasFolders = !BookmarkFolders.isUnfiled(bookmark);
+        // A bookmark with neither yet shows an invitation to add them instead
+        noteText.setVisibility(hasNote || !hasFolders ? View.VISIBLE : View.GONE);
+        noteText.setText(hasNote ? bookmark.note
+                : noteBar.getContext().getString(R.string.bookmark_add_note_hint));
+        noteText.setAlpha(hasNote ? 1f : 0.7f);
         noteFolders.setVisibility(hasFolders ? View.VISIBLE : View.GONE);
         noteFolders.setText(hasFolders ? noteBar.getContext().getString(
                 R.string.bookmark_folders_label, TextUtils.join(", ", bookmark.folders)) : null);
-        noteBar.setVisibility(hasNote || hasFolders ? View.VISIBLE : View.GONE);
     }
 
     private void editFoldersAndNote() {
@@ -148,11 +154,11 @@ public class ArticleFragment extends Fragment {
                                 .show();
                     } else {
                         bookmarks.remove(url);
-                        displayBookmarked(false);
+                        refreshBookmarkState();
                     }
                 } else {
                     bookmarks.add(url);
-                    displayBookmarked(true);
+                    refreshBookmarkState();
                 }
             }
             return true;

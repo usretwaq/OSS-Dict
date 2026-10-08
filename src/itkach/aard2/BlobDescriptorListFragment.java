@@ -192,6 +192,16 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
             newFolderChip.setCheckable(false);
             newFolderChip.setOnClickListener(view -> BookmarkFolderDialogs.promptNewFolder(requireActivity()));
             folderChips.addView(newFolderChip);
+            if (!names.isEmpty()) {
+                // Renaming and deleting, also offered by a long press on a folder
+                Chip manageChip = new Chip(folderChips.getContext());
+                manageChip.setText(R.string.folders_manage);
+                manageChip.setChipIconResource(R.drawable.ic_edit);
+                manageChip.setChipIconVisible(true);
+                manageChip.setCheckable(false);
+                manageChip.setOnClickListener(view -> BookmarkFolderDialogs.showManageDialog(requireActivity()));
+                folderChips.addView(manageChip);
+            }
         }
 
         // Ticking the entry of the folder being shown unticks the others: single selection
@@ -303,7 +313,6 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         });
         setSortOrder(menu.findItem(R.id.action_sort_order), list.getSortOrder());
         setAscending(menu.findItem(R.id.action_sort_asc), list.isAscending());
-        menu.findItem(R.id.action_manage_folders).setVisible(supportsFolders());
 
         super.onPrepareOptionsMenu(menu);
     }
@@ -360,10 +369,6 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
                 list.setSort(BlobDescriptorList.SortOrder.TIME);
             }
             setSortOrder(mi, list.getSortOrder());
-            return true;
-        }
-        if (itemId == R.id.action_manage_folders) {
-            BookmarkFolderDialogs.showManageDialog(requireActivity());
             return true;
         }
         return super.onOptionsItemSelected(mi);
