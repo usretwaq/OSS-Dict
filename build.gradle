@@ -47,6 +47,13 @@ android {
         targetSdk 36
         versionCode 80
         versionName "2.1.0"
+        // The fork's own builds number themselves, see .github/workflows/build-apk.yml
+        if (project.hasProperty('buildVersionCode')) {
+            versionCode(Integer.parseInt(project.property('buildVersionCode').toString()))
+        }
+        if (project.hasProperty('buildVersionName')) {
+            versionName(project.property('buildVersionName').toString())
+        }
         buildConfigField "String", "REPO_URL", "\"${getGitRepoUrl()}\""
         buildConfigField "String", "SPONSORS_URL", "\"${getGitSponsorsUrl()}\""
     }

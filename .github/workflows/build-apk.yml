@@ -1,7 +1,8 @@
 name: Build APK
 
-# Builds the fork's own app ("OSS Dict+": bookmark folders and notes) and publishes the
-# APK as a GitHub release, so it can be downloaded straight onto a phone.
+# Builds the fork's own app ("OSS Dict+": bookmark folders and notes), runs it on an
+# emulator and, when that went well, publishes the APK as a GitHub release, so it can
+# be downloaded straight onto a phone.
 #
 # Unlike release.yml this needs no secrets: the APK is signed with the key in
 # ci/personal-build.keystore, see ci/README.md.
@@ -23,7 +24,7 @@ env:
   KEYSTORE_FILE: ci/personal-build.keystore
   KEYSTORE_PASSWORD: ossdict-plus
   KEYSTORE_ALIAS: ossdictplus
-  # SHA-256 of the signing certificate; the build fails if the APK carries another one
+  # SHA-256 of the signing certificate; the build fails if an APK carries another one
   EXPECTED_CERT_SHA256: e829749b2a431003d6dc220dbc25c85ae9df7b84d4648b434c43be400f01de31
 
 jobs:
@@ -72,8 +73,8 @@ jobs:
             -Pandroid.injected.signing.store.password="${KEYSTORE_PASSWORD}" \
             -Pandroid.injected.signing.key.alias="${KEYSTORE_ALIAS}" \
             -Pandroid.injected.signing.key.password="${KEYSTORE_PASSWORD}" \
-            -Pandroid.injected.version.code="${{ steps.version.outputs.version_code }}" \
-            -Pandroid.injected.version.name="${{ steps.version.outputs.version_name }}" \
+            -PbuildVersionCode="${{ steps.version.outputs.version_code }}" \
+            -PbuildVersionName="${{ steps.version.outputs.version_name }}" \
             2>&1 | tee build-apk.log
 
       - name: Collect and check the APKs
@@ -86,7 +87,8 @@ jobs:
           build_tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
           for apk in dist/*.apk; do
             echo "== $apk"
-            "$build_tools/aapt2" dump badging "$apk" | grep -E "^package:|^sdkVersion|^targetSdkVersion|^application-label:"
+            "$build_tools/aapt2" dump badging "$apk" | grep -E "^package:|^sdkVersion|^targetSdkVersion|^application-label:" | tee badging.txt
+            grep -q "versionName='${{ steps.version.outputs.version_name }}'" badging.txt
             "$build_tools/apksigner" verify --print-certs "$apk" | tee cert.txt
             grep -qi "SHA-256 digest: ${EXPECTED_CERT_SHA256}" cert.txt
           done
@@ -99,26 +101,6 @@ jobs:
           path: dist/*.apk
           retention-days: 30
           if-no-files-found: error
-
-      - name: Publish release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          {
-            echo "OSS Dict+ is OSS-Dict with **bookmark folders and notes**."
-            echo
-            echo "To install: open this page on the phone, download the \`.apk\` below and open it."
-            echo "It installs next to the original OSS-Dict (it has its own app id), and newer"
-            echo "builds from this page update it in place."
-            echo
-            echo "Built from commit ${GITHUB_SHA}."
-          } > release-notes.md
-          gh release create "${{ steps.version.outputs.tag }}" \
-            "dist/OSS-Dict-plus-${{ steps.version.outputs.version_name }}.apk" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --target "${GITHUB_SHA}" \
-            --title "OSS Dict+ ${{ steps.version.outputs.version_name }}" \
-            --notes-file release-notes.md
 
       # The job logs are not readable without signing in to GitHub: keep a copy on a
       # branch, where the failure can be read with plain git.
@@ -138,3 +120,87 @@ jobs:
           git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
             commit -q -m "Logs of failed build ${GITHUB_RUN_NUMBER} (${GITHUB_SHA})"
           git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-logs
+
+  # Installs the built APKs on an emulator and walks through folders and notes the way a
+  # person would, see ci/smoke/smoke.py. Screenshots of every step end up on the ci-smoke
+  # branch, whether the run passed or not.
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download the APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: OSS-Dict-plus-${{ needs.build.outputs.version_name }}
+          path: dist
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the app on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          enable-hw-keyboard: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: python3 ci/smoke/smoke.py dist smoke-out
+
+      - name: Keep the screenshots
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p smoke-out
+          cd smoke-out
+          rm -rf dictionaries
+          echo "run ${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT} commit ${GITHUB_SHA} version ${{ needs.build.outputs.version_name }}" > RUN.txt
+          git init -q
+          git checkout -q -b ci-smoke
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
+            commit -q -m "Emulator run of build ${GITHUB_RUN_NUMBER} (${GITHUB_SHA})"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-smoke
+
+  publish:
+    needs: [build, smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Download the APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: OSS-Dict-plus-${{ needs.build.outputs.version_name }}
+          path: dist
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "OSS Dict+ is OSS-Dict with **bookmark folders and notes**."
+            echo
+            echo "To install: open this page on the phone, download the \`.apk\` below and open it."
+            echo "It installs next to the original OSS-Dict (it has its own app id), and newer"
+            echo "builds from this page update it in place."
+            echo
+            echo "Built from commit ${GITHUB_SHA}."
+          } > release-notes.md
+          gh release create "${{ needs.build.outputs.tag }}" \
+            "dist/OSS-Dict-plus-${{ needs.build.outputs.version_name }}.apk" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "OSS Dict+ ${{ needs.build.outputs.version_name }}" \
+            --notes-file release-notes.md
