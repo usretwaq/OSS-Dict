@@ -378,16 +378,21 @@ def picked_in_folder_list(root):
 
 
 def expect_folder_list(wanted, picked):
-    """Checks the open list of folders: its entries in order, and the one that is ticked."""
+    """Checks the open list of folders: its entries in order, and the one that is ticked.
+
+    An expected entry is its text, or a pattern for a text that depends on the room there is."""
     deadline = time.time() + 15
     while True:
         root = dump()
-        found = folder_list_entries(root), picked_in_folder_list(root)
-        if found == (list(wanted), [picked]):
+        entries, ticked = folder_list_entries(root), picked_in_folder_list(root)
+        if len(entries) == len(wanted) and ticked == [picked] and all(
+                expected.match(entry) if hasattr(expected, "match") else entry == expected
+                for entry, expected in zip(entries, wanted)):
             return
         if time.time() > deadline:
             raise AssertionError("the folder list shows %s with %s ticked, expected %s with %s ticked"
-                                 % (found[0], found[1], list(wanted), [picked]))
+                                 % (entries, ticked, [getattr(expected, "pattern", expected)
+                                                      for expected in wanted], [picked]))
         time.sleep(1)
 
 
@@ -796,6 +801,9 @@ def restart_keeps_everything():
 # Wide enough to push the folders after them out of sight
 LONG_FOLDERS = ["Long folder name to fill the row A", "Long folder name to fill the row B"]
 LONG_CHIPS = [name + " (0)" for name in LONG_FOLDERS]
+# Too long for the list of folders, which shortens them in the middle: the end, where the two
+# differ, and the number of bookmarks stay
+LONG_ENTRIES = [re.compile(r"^Long fo.+\u2026.+row %s \(0\)$" % letter) for letter in "AB"]
 
 
 def shown_folder_comes_into_view():
@@ -819,7 +827,7 @@ def shown_folder_comes_into_view():
         raise AssertionError("the row is not long enough to hide a folder: this proves nothing")
     shot("bookmarks_many_folders")
     open_folder_list()
-    expect_folder_list(["All (3)", "Empty one (0)", LONG_CHIPS[0], LONG_CHIPS[1], "Verbs2 (1)",
+    expect_folder_list(["All (3)", "Empty one (0)", LONG_ENTRIES[0], LONG_ENTRIES[1], "Verbs2 (1)",
                         "No folder (2)", "New folder", "Manage folders"], picked="All (3)")
     shot("folder_list_many_folders")
     tap_text(text="Verbs2 (1)")

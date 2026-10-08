@@ -2,9 +2,12 @@ package itkach.aard2;
 
 import android.app.Activity;
 import android.content.SharedPreferences;
+import android.content.res.TypedArray;
 import android.database.DataSetObserver;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.text.TextPaint;
+import android.text.TextUtils;
 import android.util.SparseBooleanArray;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -25,6 +28,7 @@ import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.TooltipCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.MenuCompat;
+import androidx.core.widget.TextViewCompat;
 
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
@@ -361,10 +365,17 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         // The context of the activity: the one of the anchor carries the colours of a chip
         PopupMenu popup = new PopupMenu(requireActivity(), anchor, Gravity.END);
         Menu menu = popup.getMenu();
+        TextPaint titlePaint = getMenuTitlePaint();
+        float titleRoom = getResources().getDimension(R.dimen.folder_menu_title_max_width);
         MenuItem shownItem = null;
         boolean hasUserFolders = false;
         for (FolderEntry entry : getFolderEntries()) {
-            MenuItem item = menu.add(MENU_GROUP_FOLDERS, Menu.NONE, Menu.NONE, entry.label);
+            // A menu puts a title on one line and cuts off what does not fit: long names that
+            // begin alike would lose what tells them apart, and their number of entries.
+            // Shortened in the middle, a title keeps both ends.
+            CharSequence title = TextUtils.ellipsize(entry.label, titlePaint, titleRoom,
+                    TextUtils.TruncateAt.MIDDLE);
+            MenuItem item = menu.add(MENU_GROUP_FOLDERS, Menu.NONE, Menu.NONE, title);
             item.setOnMenuItemClickListener(picked -> {
                 showFolder(entry);
                 return true;
@@ -396,6 +407,20 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         }
         MenuCompat.setGroupDividerEnabled(menu, true);
         popup.show();
+    }
+
+    /** The text settings a popup menu draws its titles with, to measure them the same way. */
+    @NonNull
+    private TextPaint getMenuTitlePaint() {
+        TypedArray attributes = requireActivity().obtainStyledAttributes(
+                new int[]{androidx.appcompat.R.attr.textAppearanceLargePopupMenu});
+        int appearance = attributes.getResourceId(0, 0);
+        attributes.recycle();
+        TextView sizer = new TextView(requireActivity());
+        if (appearance != 0) {
+            TextViewCompat.setTextAppearance(sizer, appearance);
+        }
+        return sizer.getPaint();
     }
 
     private List<BlobDescriptor> getSelectedItems() {

@@ -6,4 +6,9 @@
     <dimen name="app_minimumsize_w">632.0dip</dimen>
     <dimen name="app_minimumsize_h">598.0dip</dimen>
 
+    <!-- Room a popup menu has for a title, even on a narrow screen: the menu gets up to 320dp
+         wide, of which a row keeps 40dp as padding and 48dp for its radio button. A bit
+         less, to be on the safe side. -->
+    <dimen name="folder_menu_title_max_width">216dp</dimen>
+
 </resources>
