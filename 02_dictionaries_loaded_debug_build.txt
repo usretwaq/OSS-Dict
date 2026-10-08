@@ -1,0 +1,11 @@
+Dictionaries
+More options
+Supported formats: .slob, .mdx, .zip (Stardict, GoldenDict), .dsl, .dsl.gz, .dsl.dz (Lingvo DSL)
+Smoke NL-EN
+Rename
+Test DSL
+Lookup
+Bookmarks
+History
+Settings
+Add

@@ -1,0 +1,9 @@
+Search folders
+Empty one (0)
+Long folder name to fill the row A (0)
+Long folder name to fill the row B (0)
+Verbs2 (1)
+Week 1 (0)
+Week 2 (0)
+Week 3 (0)
+Cancel

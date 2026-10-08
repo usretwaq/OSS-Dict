@@ -1,0 +1,16 @@
+Dictionaries
+More options
+No dictionaries are open
+
+OSS-Dict supports the following formats:
+.slob (Aard/slob)
+.mdx (MDict)
+.zip (StarDict .ifo/.dict/.idx)
+.dsl/.dsl.gz/.dsl.dz (Lingvo DSL) 
+Select Dictionary Folder
+Get dictionaries
+Lookup
+Bookmarks
+History
+Settings
+Add

@@ -1,0 +1,117 @@
+debug: dist/OSS-Dict-plus-2.1.0-folders.13-debug.apk
+release: dist/OSS-Dict-plus-2.1.0-folders.13.apk
+== install, load the test dictionaries
+   16 / API 36 / Physical size: 1080x2400
+  [01] first_start_no_dictionaries
+   in the dictionary folder: total 32
+drwxrws--- 2 u0_a216 ext_data_rw 4096 2026-10-08 11:53 .
+drwxrws--- 3 u0_a216 ext_data_rw 4096 2026-10-08 11:53 ..
+-rw-rw-rw- 1 shell   ext_data_rw  784 2026-10-08 11:53 smoke-nl-en.zip
+-rw-rw-rw- 1 shell   ext_data_rw  980 2026-10-08 11:51 test.dsl
+  [02] dictionaries_loaded_debug_build
+   ok
+== update to the release build
+  [03] dictionaries_after_update_to_release
+   ok
+== article toolbar as before, new entry in the menu
+  [04] article_not_bookmarked
+  [05] article_overflow_menu
+   ok
+== file an article under a new folder with a note
+  [06] edit_dialog_no_folders_yet
+  [07] new_folder_prompt
+  [08] edit_dialog_folder_created_and_ticked
+  [09] edit_dialog_note_typed
+  [10] article_with_note_bar
+   ok
+== bookmark, then file it from the bar under the article
+  [11] article_bookmarked_bar_invites
+  [12] edit_dialog_second_folder
+  [13] article_folder_only
+   ok
+== cancelled or empty edit saves nothing
+  [14] edit_dialog_about_to_cancel
+   ok
+== bookmarks tab lists folders, notes and counts
+  [15] bookmarks_all
+   ok
+== pick a folder
+  [16] bookmarks_folder_verbs
+  [17] bookmarks_no_folder
+   ok
+== pick a folder from the list of folders
+  [18] folder_list
+  [19] folder_list_folder_picked
+   ok
+== file several bookmarks at once
+  [20] bookmarks_two_selected
+  [21] edit_dialog_two_bookmarks_verbs_indeterminate
+  [22] bookmarks_after_filing_two
+   ok
+== edit one bookmark from the list
+  [23] edit_dialog_single_from_list
+   ok
+== rename and delete folders
+  [24] manage_folders
+  [25] folder_actions
+  [26] rename_prompt
+  [27] bookmarks_after_rename
+  [28] delete_folder_confirmation
+  [29] bookmarks_after_delete_folder
+   ok
+== empty folder
+  [30] bookmarks_empty_folder
+   ok
+== article opened from bookmarks, guarded removal
+  [31] article_opened_from_bookmarks
+  [32] edit_dialog_opened_from_note_bar
+  [33] remove_bookmark_confirmation
+   ok
+== edit the note of an article opened from the list
+  [34] edit_dialog_survives_tap_outside
+  [35] article_from_list_after_saving_note
+   ok
+== take an article out of the folder it was opened from
+  [36] edit_dialog_leaving_the_folder_shown
+  [37] bookmarks_folder_emptied_from_article
+   ok
+== history and lookup lists look as before
+  [38] history_unchanged
+  [39] lookup_unchanged
+   ok
+== the filter searches notes too
+  [40] bookmarks_filter_matches_note
+   ok
+== restart keeps folders, notes and the folder shown
+  [41] bookmarks_after_restart_still_in_folder
+   ok
+== the folder shown is scrolled into view
+  [42] bookmarks_many_folders
+  [43] folder_list_many_folders
+  [44] bookmarks_folder_picked_from_list
+  [45] bookmarks_shown_folder_in_view_after_restart
+   ok
+== search the folders by name
+  [46] folder_list_with_search
+  [47] folder_search_nothing_typed
+  [48] folder_search_nothing_found
+  [49] folder_search_several_found
+  [50] folder_search_one_found
+  [51] bookmarks_folder_found_by_search
+   ok
+== dark theme
+  [52] dark_bookmarks
+  [53] dark_folder_list
+  [54] dark_article_with_note_bar
+  [55] dark_edit_dialog
+   ok
+== backup: export, delete, import
+  [56] backup_export_file_picker
+  [57] bookmarks_before_import
+  [58] backup_import_file_picker
+  [59] bookmarks_after_import
+   ok
+== no crash in the log
+   5018 log lines of the app kept, processes ['11401', '11729', '13009', '14634', '2195', '2997', '3784']
+   ok
+RESULT: OK

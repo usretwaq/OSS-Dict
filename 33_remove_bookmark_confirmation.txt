@@ -1,0 +1,3 @@
+Remove this bookmark? Its note and folders will be lost.
+No
+Yes
