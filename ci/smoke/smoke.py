@@ -595,6 +595,32 @@ def edit_note_of_article_from_list():
     expect("Filter", "By Time")
 
 
+def leave_shown_folder_from_article():
+    """Opens the only bookmark of a folder out of that folder and takes it out of the folder:
+    nothing is left to page through, the article closes and the folder shows as empty."""
+    tap_chip("Verbs2 (1)")
+    wait_gone(text="huis")
+    tap_text(text="lopen")
+    wait_for(text="Bookmark", timeout=60)
+    tap(wait_for(contains="Folders: Verbs2"))
+    wait_for(text="New folder")
+    tap_text(text="Verbs2", cls="CheckBox")
+    shot("edit_dialog_leaving_the_folder_shown")
+    tap_text(text="Save")
+    expect("No bookmarks in this folder")
+    expect_chips("All (3)", "Empty one (0)", "Verbs2 (0)", "New folder", "Manage folders")
+    shot("bookmarks_folder_emptied_from_article")
+    # Back into the folder, for the steps that follow
+    tap_chip("All (3)")
+    long_press(wait_for(text="lopen"))
+    tap_text(text="Folders & note")
+    wait_for(text="New folder")
+    tap_text(text="Verbs2", cls="CheckBox")
+    tap_text(text="Save")
+    expect_chips("All (3)", "Empty one (0)", "Verbs2 (1)", "No folder (2)", "New folder", "Manage folders")
+    expect("lopen", "huis", "fiets", "to walk, irregular past tense liep")
+
+
 def other_lists_unchanged():
     start_main()
     open_tab("History")
@@ -722,7 +748,8 @@ def backup_round_trip():
         tap_text(text="Show roots")
         tap_text(text="Downloads")
     shot("backup_import_file_picker")
-    tap_text(contains="oss-dict-backup")
+    # The name itself: the button on the thumbnail carries the name too, but only previews
+    tap_text(text="oss-dict-backup.json")
     time.sleep(4)
     start_main()
     open_tab("Bookmarks")
@@ -776,6 +803,7 @@ def main():
             ("empty folder", empty_folder),
             ("article opened from bookmarks, guarded removal", article_from_bookmarks_and_removal),
             ("edit the note of an article opened from the list", edit_note_of_article_from_list),
+            ("take an article out of the folder it was opened from", leave_shown_folder_from_article),
             ("history and lookup lists look as before", other_lists_unchanged),
             ("the filter searches notes too", filter_searches_notes),
             ("restart keeps folders, notes and the folder shown", restart_keeps_everything),
