@@ -2,6 +2,12 @@
   OSS-Dict is a fork of [Aard 2 for Android](https://github.com/itkach/aard2-android). It
   comes with Material design 3 interface, bug fixes and improvements.
 
+> **OSS Dict+** — this branch is a personal build of [OSS-Dict](https://github.com/Akylas/OSS-Dict)
+> that adds [folders and notes to bookmarks](#bookmark-folders-and-notes). It installs next to the
+> original app (app id `io.github.usretwaq.ossdict`). Its APKs are on this repository's
+> [releases page](../../releases); the installation badges below are those of the original app.
+> How it is built and checked: [ci/README.md](ci/README.md).
+
    
 <h2 align="center">Enjoying OSS-Dict?</h2>
 <p align="center">Please consider making a small donation to help fund the project. Developing an application, especially one that is open source and completely free, takes a lot of time and effort.
@@ -72,6 +78,24 @@ remove bookmark or history record, long tap a list item to enter
 selection mode, tap items to be removed, tap Trash Can icon and
 confirm. A bookmark can also be removed by tapping Bookmark icon
 when viewing article.
+
+### Bookmark Folders and Notes
+
+A bookmark can be filed under any number of folders and carry a
+note. A bookmarked article shows a bar at the bottom with its note
+and folders; tap it to edit them. "Folders & note" in the article
+menu opens the same dialog, and bookmarks the article when a note or
+a folder is saved for it.
+
+In Bookmarks tab, the row above the list picks the folder to show:
+all bookmarks, one folder, or the ones in no folder. "New folder"
+creates a folder; a long tap on a folder, or "Manage folders",
+renames or deletes it. Deleting a folder keeps its bookmarks. To file
+several bookmarks at once, long tap to select them and tap the
+"Folders & note" icon. Each bookmark lists its folders and note, and
+the filter searches notes as well as titles.
+
+Folders and notes are part of the backup file (Settings, Backup).
 
 ### Dictionary Management
 
