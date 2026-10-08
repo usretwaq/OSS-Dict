@@ -396,6 +396,19 @@ def expect_folder_list(wanted, picked):
         time.sleep(1)
 
 
+def expect_search_results(*wanted):
+    """Waits until the folder search lists exactly the given folders, top to bottom."""
+    deadline = time.time() + 15
+    while True:
+        found = [node.get("text") for node in dump().iter("node")
+                 if node.get("class", "").endswith("TextView") and CHIP_LABEL.match(node.get("text") or "")]
+        if found == list(wanted):
+            return
+        if time.time() > deadline:
+            raise AssertionError("the folder search lists %s, expected %s" % (found, list(wanted)))
+        time.sleep(1)
+
+
 def open_article_dialog_from_menu():
     tap_text(text="More options")
     tap_text(text="Folders & note")
@@ -856,6 +869,59 @@ def shown_folder_comes_into_view():
         raise AssertionError("the selector did not scroll back to All: %s" % chip_labels())
 
 
+# With these there are enough folders for the list of folders to offer searching them
+MORE_FOLDERS = ["Week 1", "Week 2", "Week 3", "Week 4"]
+MORE_CHIPS = [name + " (0)" for name in MORE_FOLDERS]
+
+
+def search_folders():
+    """From eight folders on, the list of folders starts with searching them by name."""
+    for name in MORE_FOLDERS:
+        open_folder_list()
+        tap_text(text="New folder")
+        wait_for(cls="EditText")
+        type_text(name)
+        tap_text(text="Save")
+        wait_gone(text="Cancel")
+    open_folder_list()
+    expect_folder_list(["Search folders", "All (3)", "Empty one (0)", LONG_ENTRIES[0], LONG_ENTRIES[1],
+                        "Verbs2 (1)"] + MORE_CHIPS + ["No folder (2)", "New folder", "Manage folders"],
+                       picked="All (3)")
+    shot("folder_list_with_search")
+    tap_text(text="Search folders")
+    wait_for(cls="EditText")
+    # Nothing typed yet: every folder is listed, as many as there is room for above the keyboard
+    expect("Empty one (0)", "Cancel")
+    shot("folder_search_nothing_typed")
+    type_text("q")
+    expect("No folder with that name")
+    shot("folder_search_nothing_found")
+    shell("input keyevent KEYCODE_DEL")
+    time.sleep(0.8)
+    type_text("week")
+    expect_search_results(*MORE_CHIPS)
+    shot("folder_search_several_found")
+    # Other capitals, and two words that are found apart from each other
+    for _ in range(4):
+        shell("input keyevent KEYCODE_DEL")
+    time.sleep(0.8)
+    type_text("WE 3")
+    expect_search_results("Week 3 (0)")
+    shot("folder_search_one_found")
+    tap_text(text="Week 3 (0)")
+    folder_list_closed()
+    expect("No bookmarks in this folder")
+    expect_picked_chip("Week 3 (0)")
+    time.sleep(1.5)
+    if not chip_in_full_view("Week 3 (0)"):
+        raise AssertionError("the folder found is cut off, the selector did not scroll to it")
+    shot("bookmarks_folder_found_by_search")
+    open_folder_list()
+    tap_text(text="All (3)")
+    folder_list_closed()
+    expect("lopen", "huis", "fiets")
+
+
 def dark_theme():
     shell("cmd uimode night yes", check=False)
     time.sleep(2)
@@ -932,7 +998,7 @@ def backup_round_trip():
     long_press(find_chip("Verbs2 (0)"))
     tap_text(text="Delete")
     tap_text(text="Delete")
-    expect_chips("All (2)", "Empty one (0)", LONG_CHIPS[0], LONG_CHIPS[1], "New folder")
+    expect_chips("All (2)", "Empty one (0)", LONG_CHIPS[0], LONG_CHIPS[1], *MORE_CHIPS, "New folder")
     shot("bookmarks_before_import")
 
     open_tab("Settings")
@@ -949,7 +1015,7 @@ def backup_round_trip():
     start_main()
     open_tab("Bookmarks")
     expect("lopen", "huis", "fiets", "to walk, irregular past tense")
-    expect_chips("All (3)", "Empty one (0)", LONG_CHIPS[0], LONG_CHIPS[1], "Verbs2 (1)",
+    expect_chips("All (3)", "Empty one (0)", LONG_CHIPS[0], LONG_CHIPS[1], "Verbs2 (1)", *MORE_CHIPS,
                  "No folder (2)", "New folder")
     shot("bookmarks_after_import")
 
@@ -1005,6 +1071,7 @@ def main():
             ("the filter searches notes too", filter_searches_notes),
             ("restart keeps folders, notes and the folder shown", restart_keeps_everything),
             ("the folder shown is scrolled into view", shown_folder_comes_into_view),
+            ("search the folders by name", search_folders),
             ("dark theme", dark_theme),
         ]
         for name, function in steps:

@@ -266,6 +266,8 @@
     <string name="action_bookmark_folders">Folders &amp; note</string>
     <string name="folders_manage">Manage folders</string>
     <string name="folders_list">Folder list</string>
+    <string name="folders_search">Search folders</string>
+    <string name="folders_search_none">No folder with that name</string>
     <string name="folders_title">Folders</string>
     <string name="folders_all">All</string>
     <string name="folders_unfiled">No folder</string>

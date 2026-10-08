@@ -3,14 +3,17 @@ package itkach.aard2.descriptor;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Folder membership and notes of bookmarks.
@@ -27,6 +30,9 @@ public final class BookmarkFolders {
 
     /** Longest folder name accepted from the user. */
     public static final int MAX_NAME_LENGTH = 40;
+
+    /** Accents and the other marks that combine with the letter before them. */
+    private static final Pattern MARKS = Pattern.compile("\\p{M}+");
 
     private BookmarkFolders() {
     }
@@ -67,6 +73,41 @@ public final class BookmarkFolders {
             }
         }
         return null;
+    }
+
+    /**
+     * Picks the folder names that contain what the user typed, in the order given. Case and
+     * accents make no difference, and words are looked for one by one, so that "ch 12" finds
+     * "Chapter 12". Nothing typed keeps every name.
+     */
+    @NonNull
+    public static List<String> search(@NonNull Collection<String> names, @Nullable String text) {
+        String[] words = fold(text == null ? "" : text).trim().split("\\s+");
+        List<String> found = new ArrayList<>();
+        for (String name : names) {
+            if (name == null) {
+                continue;
+            }
+            String folded = fold(name);
+            boolean hasEveryWord = true;
+            for (String word : words) {
+                if (!folded.contains(word)) {
+                    hasEveryWord = false;
+                    break;
+                }
+            }
+            if (hasEveryWord) {
+                found.add(name);
+            }
+        }
+        return found;
+    }
+
+    /** Lower case and without accents: the form two texts are compared in when searching. */
+    @NonNull
+    private static String fold(@NonNull String text) {
+        String decomposed = Normalizer.normalize(text, Normalizer.Form.NFD);
+        return MARKS.matcher(decomposed).replaceAll("").toLowerCase(Locale.ROOT);
     }
 
     /** True when the bookmark is filed under the given folder. */

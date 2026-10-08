@@ -60,9 +60,16 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
     /** Tag of the folder selector entry that shows the entries of every folder. */
     private static final Object ALL_FOLDERS = new Object();
 
-    /** Groups of the folder list menu: the folders to pick from, then what to do with them. */
-    private static final int MENU_GROUP_FOLDERS = 1;
-    private static final int MENU_GROUP_ACTIONS = 2;
+    /**
+     * Groups of the folder list menu: searching the folders, the folders to pick from, then
+     * what to do with them.
+     */
+    private static final int MENU_GROUP_SEARCH = 1;
+    private static final int MENU_GROUP_FOLDERS = 2;
+    private static final int MENU_GROUP_ACTIONS = 3;
+
+    /** From this many folders on the folder list offers to search them: fewer fit a screen. */
+    private static final int FOLDER_SEARCH_MIN_FOLDERS = 8;
 
     /** One entry of the folder selector: what picking it shows, and how it is labelled. */
     private static final class FolderEntry {
@@ -357,7 +364,8 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
     /**
      * Lists the folder selector top to bottom, in a menu dropping down from the given view:
      * the short way to a folder that is far along the row. The menu ends with creating a
-     * folder and managing the folders, which keeps them at hand however long the row is.
+     * folder and managing the folders, which keeps them at hand however long the row is,
+     * and starts with searching the folders once they are too many for one screen.
      */
     private void showFolderMenu(@NonNull View anchor) {
         String shown = getDescriptorList().getFolderFilter();
@@ -365,11 +373,26 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         // The context of the activity: the one of the anchor carries the colours of a chip
         PopupMenu popup = new PopupMenu(requireActivity(), anchor, Gravity.END);
         Menu menu = popup.getMenu();
+        List<FolderEntry> entries = getFolderEntries();
+        int userFolders = 0;
+        for (FolderEntry entry : entries) {
+            if (entry.isUserFolder()) {
+                userFolders++;
+            }
+        }
+        if (userFolders >= FOLDER_SEARCH_MIN_FOLDERS) {
+            // First, where it is on screen however long the list below it gets
+            menu.add(MENU_GROUP_SEARCH, Menu.NONE, Menu.NONE, R.string.folders_search)
+                    .setOnMenuItemClickListener(picked -> {
+                        BookmarkFolderDialogs.showSearchDialog(requireActivity(),
+                                folder -> getDescriptorList().setFolderFilter(folder));
+                        return true;
+                    });
+        }
         TextPaint titlePaint = getMenuTitlePaint();
         float titleRoom = getResources().getDimension(R.dimen.folder_menu_title_max_width);
         MenuItem shownItem = null;
-        boolean hasUserFolders = false;
-        for (FolderEntry entry : getFolderEntries()) {
+        for (FolderEntry entry : entries) {
             // A menu puts a title on one line and cuts off what does not fit: long names that
             // begin alike would lose what tells them apart, and their number of entries.
             // Shortened in the middle, a title keeps both ends.
@@ -383,9 +406,6 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
             if (shownTag.equals(entry.tag)) {
                 shownItem = item;
             }
-            if (entry.isUserFolder()) {
-                hasUserFolders = true;
-            }
         }
         // Exclusive: the entries get a radio button, ticked for the folder being shown
         menu.setGroupCheckable(MENU_GROUP_FOLDERS, true, true);
@@ -397,7 +417,7 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
                     BookmarkFolderDialogs.promptNewFolder(requireActivity());
                     return true;
                 });
-        if (hasUserFolders) {
+        if (userFolders > 0) {
             // Renaming and deleting, also offered by a long press on a folder of the row
             menu.add(MENU_GROUP_ACTIONS, Menu.NONE, Menu.NONE, R.string.folders_manage)
                     .setOnMenuItemClickListener(picked -> {

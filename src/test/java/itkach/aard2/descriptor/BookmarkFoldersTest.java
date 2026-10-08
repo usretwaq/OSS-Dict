@@ -57,6 +57,31 @@ public class BookmarkFoldersTest {
         assertNull(BookmarkFolders.findIgnoreCase(names, "Nouns"));
     }
 
+    @Test
+    public void searchIgnoresCaseAndAccents() {
+        List<String> names = Arrays.asList("Café words", "Verbs", "Глаголы");
+        assertEquals(Collections.singletonList("Café words"), BookmarkFolders.search(names, "CAFE"));
+        assertEquals(Collections.singletonList("Café words"), BookmarkFolders.search(names, "café"));
+        assertEquals(Collections.singletonList("Verbs"), BookmarkFolders.search(names, "ERB"));
+        assertEquals(Collections.singletonList("Глаголы"), BookmarkFolders.search(names, "глаг"));
+    }
+
+    @Test
+    public void searchLooksForEveryWordTyped() {
+        List<String> names = Arrays.asList("Chapter 1", "Chapter 12", "Week 12");
+        assertEquals(Collections.singletonList("Chapter 12"), BookmarkFolders.search(names, " ch  12 "));
+        assertEquals(Arrays.asList("Chapter 12", "Week 12"), BookmarkFolders.search(names, "12"));
+        assertTrue(BookmarkFolders.search(names, "ch 7").isEmpty());
+    }
+
+    @Test
+    public void searchWithNothingTypedKeepsEveryNameInOrder() {
+        List<String> names = Arrays.asList("Verbs", "Nouns");
+        assertEquals(names, BookmarkFolders.search(names, ""));
+        assertEquals(names, BookmarkFolders.search(names, "   "));
+        assertEquals(names, BookmarkFolders.search(names, null));
+    }
+
     // ── membership ───────────────────────────────────────────────────────────
 
     @Test

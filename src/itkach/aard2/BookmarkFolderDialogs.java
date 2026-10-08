@@ -9,7 +9,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.MainThread;
@@ -26,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import itkach.aard2.descriptor.BlobDescriptor;
@@ -46,6 +50,11 @@ public final class BookmarkFolderDialogs {
     /** Receives a folder name typed by the user, cleaned up and never empty. */
     private interface OnFolderNamed {
         void onFolderNamed(@NonNull String name);
+    }
+
+    /** Receives the folder the user picked in the search dialog. */
+    public interface OnFolderPicked {
+        void onFolderPicked(@NonNull String folder);
     }
 
     /** Receives what the user picked in the folders and note dialog. */
@@ -278,6 +287,69 @@ public final class BookmarkFolderDialogs {
                     (dialog, which) -> showFolderActions(context, names.get(which)));
         }
         builder.show();
+    }
+
+    /**
+     * Finds a folder by part of its name, for when there are too many to look through. The
+     * folders listed narrow down while the user types, see {@link BookmarkFolders#search};
+     * picking one closes the dialog.
+     */
+    @MainThread
+    public static void showSearchDialog(@NonNull Context context, @NonNull OnFolderPicked onFolderPicked) {
+        List<String> names = getAllFolderNames();
+        Map<String, Integer> counts = SlobHelper.getInstance().bookmarks.getFolderCounts();
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context);
+        View content = LayoutInflater.from(builder.getContext()).inflate(R.layout.dialog_folder_search, null);
+        EditText input = content.findViewById(R.id.folder_search_input);
+        ListView list = content.findViewById(R.id.folder_search_list);
+        // Holds the names of the folders found, shown with their number of bookmarks
+        ArrayAdapter<String> found = new ArrayAdapter<String>(builder.getContext(),
+                R.layout.folder_search_item, new ArrayList<>(names)) {
+            @NonNull
+            @Override
+            public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
+                TextView row = (TextView) super.getView(position, convertView, parent);
+                String name = getItem(position);
+                Integer count = counts.get(name);
+                row.setText(context.getString(R.string.folders_chip_label, name, count == null ? 0 : count));
+                return row;
+            }
+        };
+        list.setAdapter(found);
+        list.setEmptyView(content.findViewById(R.id.folder_search_empty));
+        AlertDialog dialog = builder.setTitle(R.string.folders_search)
+                .setView(content)
+                .setNegativeButton(R.string.action_cancel, null)
+                .create();
+        list.setOnItemClickListener((parent, view, position, id) -> {
+            String name = found.getItem(position);
+            dialog.dismiss();
+            if (name != null) {
+                onFolderPicked.onFolderPicked(name);
+            }
+        });
+        input.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence text, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence text, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable text) {
+                found.clear();
+                found.addAll(BookmarkFolders.search(names, text.toString()));
+            }
+        });
+        // Typing is what this dialog is for: bring up the keyboard right away
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        }
+        input.requestFocus();
+        dialog.show();
     }
 
     /** Offers to rename or delete the given folder. */
