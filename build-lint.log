@@ -1,0 +1,138 @@
+Downloading https://services.gradle.org/distributions/gradle-8.13-bin.zip
+.............10%.............20%.............30%.............40%.............50%.............60%.............70%.............80%.............90%.............100%
+
+Welcome to Gradle 8.13!
+
+Here are the highlights of this release:
+ - Daemon JVM auto-provisioning
+ - Enhancements for Scala plugin and JUnit testing
+ - Improvements for build authors and plugin developers
+
+For more details see https://docs.gradle.org/8.13/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.13/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :
+license.html
+
+> Task :slobj:preBuild UP-TO-DATE
+> Task :slobj:preDebugBuild UP-TO-DATE
+> Task :slobj:checkDebugAarMetadata
+> Task :slobj:mergeDebugJniLibFolders
+> Task :slobj:mergeDebugNativeLibs NO-SOURCE
+> Task :slobj:stripDebugDebugSymbols NO-SOURCE
+> Task :slobj:copyDebugJniLibsProjectAndLocalJars
+> Task :slobj:generateDebugResValues
+> Task :slobj:generateDebugResources
+> Task :slobj:packageDebugResources
+> Task :slobj:processDebugNavigationResources
+> Task :slobj:extractDeepLinksForAarDebug
+> Task :slobj:mergeDebugShaders
+> Task :slobj:compileDebugShaders NO-SOURCE
+> Task :slobj:generateDebugAssets UP-TO-DATE
+> Task :slobj:mergeDebugAssets
+> Task :slobj:javaPreCompileDebug
+> Task :slobj:prepareDebugArtProfile
+> Task :slobj:prepareLintJarForPublish
+> Task :slobj:parseDebugLocalResources
+> Task :slobj:processDebugJavaRes NO-SOURCE
+> Task :slobj:writeDebugAarMetadata
+> Task :preBuild UP-TO-DATE
+> Task :preDebugBuild UP-TO-DATE
+> Task :slobj:generateDebugRFile
+> Task :generateDebugBuildConfig
+> Task :slobj:processDebugManifest
+> Task :slobj:mergeDebugJavaResource
+> Task :slobj:extractDebugAnnotations
+
+> Task :slobj:compileDebugJavaWithJavac
+Note: /home/runner/work/OSS-Dict/OSS-Dict/slobj/src/main/java/itkach/slob/Slob.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :slobj:mergeDebugGeneratedProguardFiles
+> Task :slobj:mergeDebugConsumerProguardFiles
+> Task :slobj:syncDebugLibJars
+> Task :slobj:bundleDebugLocalLintAar
+> Task :javaPreCompileDebug FROM-CACHE
+> Task :checkDebugAarMetadata
+> Task :processDebugNavigationResources
+> Task :generateDebugResValues FROM-CACHE
+> Task :compileDebugNavigationResources
+> Task :mapDebugSourceSetPaths
+> Task :generateDebugResources
+> Task :packageDebugResources
+> Task :createDebugCompatibleScreenManifests
+> Task :extractDeepLinksDebug
+> Task :slobj:extractDeepLinksDebug
+> Task :parseDebugLocalResources
+> Task :processDebugMainManifest
+> Task :processDebugManifest
+> Task :slobj:compileDebugLibraryResources
+> Task :preDebugAndroidTestBuild SKIPPED
+> Task :generateDebugAndroidTestResValues FROM-CACHE
+> Task :processDebugManifestForPackage
+> Task :slobj:bundleLibCompileToJarDebug
+> Task :slobj:bundleLibRuntimeToJarDebug
+> Task :slobj:writeDebugLintModelMetadata
+> Task :slobj:createFullJarDebug
+> Task :extractProguardFiles
+> Task :slobj:extractProguardFiles
+> Task :mergeDebugResources
+> Task :slobj:generateDebugLintModel
+> Task :preDebugUnitTestBuild UP-TO-DATE
+> Task :slobj:preDebugAndroidTestBuild UP-TO-DATE
+> Task :slobj:generateDebugAndroidTestResValues FROM-CACHE
+> Task :slobj:generateDebugAndroidTestLintModel
+> Task :slobj:preDebugUnitTestBuild UP-TO-DATE
+> Task :slobj:generateDebugUnitTestLintModel
+> Task :processDebugResources
+
+> Task :compileDebugJavaWithJavac
+/home/runner/work/OSS-Dict/OSS-Dict/src/itkach/aard2/SlobHelper.java:365: warning: [dep-ann] deprecated item is not annotated with @Deprecated
+    public Slob[] getActiveSlobs() {
+                  ^
+
+> Task :slobj:lintAnalyzeDebugAndroidTest
+> Task :slobj:lintAnalyzeDebugUnitTest
+
+> Task :compileDebugJavaWithJavac
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: /home/runner/work/OSS-Dict/OSS-Dict/src/itkach/aard2/MainActivity.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+1 warning
+
+> Task :bundleDebugClassesToCompileJar
+> Task :generateDebugLintReportModel
+> Task :slobj:lintAnalyzeDebug
+> Task :generateDebugAndroidTestLintModel
+> Task :generateDebugUnitTestLintModel
+> Task :slobj:generateDebugLintReportModel
+> Task :lintAnalyzeDebugAndroidTest
+
+> Task :slobj:lintReportDebug
+Wrote HTML report to file:///home/runner/work/OSS-Dict/OSS-Dict/slobj/build/reports/lint-results-debug.html
+
+> Task :slobj:lintDebug
+> Task :slobj:lint
+> Task :lintAnalyzeDebugUnitTest
+> Task :lintAnalyzeDebug
+
+> Task :lintReportDebug
+Wrote HTML report to file:///home/runner/work/OSS-Dict/OSS-Dict/build/reports/lint-results-debug.html
+
+> Task :lintDebug
+> Task :lint
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1791460092051.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/OSS-Dict/OSS-Dict/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 28s
+70 actionable tasks: 66 executed, 4 from cache
