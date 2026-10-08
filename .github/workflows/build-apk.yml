@@ -196,7 +196,8 @@ jobs:
             echo "It installs next to the original OSS-Dict (it has its own app id), and newer"
             echo "builds from this page update it in place."
             echo
-            echo "Built from commit ${GITHUB_SHA}."
+            echo "Built from commit ${GITHUB_SHA} and run on an Android emulator before it was"
+            echo "published (screenshots of that run: branch \`ci-smoke\`)."
           } > release-notes.md
           gh release create "${{ needs.build.outputs.tag }}" \
             "dist/OSS-Dict-plus-${{ needs.build.outputs.version_name }}.apk" \
@@ -204,3 +205,21 @@ jobs:
             --target "${GITHUB_SHA}" \
             --title "OSS Dict+ ${{ needs.build.outputs.version_name }}" \
             --notes-file release-notes.md
+
+      # One build to pick on the releases page: the earlier ones stay downloadable, but say
+      # that they are not the current one and no longer count as the latest release.
+      - name: Mark the earlier builds as older
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The new release is out by now: nothing below may fail the run
+          earlier=$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate \
+            --jq '.[] | select(.tag_name | test("-folders\\.[0-9]+$")) | "\(.id) \(.tag_name)"' || true)
+          while read -r release_id release_tag; do
+            if [ -n "$release_id" ] && [ "$release_tag" != "${{ needs.build.outputs.tag }}" ]; then
+              gh api -X PATCH "repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+                -F prerelease=true \
+                -f body="**Older build.** A newer one is available: https://github.com/${GITHUB_REPOSITORY}/releases/latest" \
+                > /dev/null || echo "::warning::could not mark ${release_tag} as older"
+            fi
+          done <<< "$earlier"

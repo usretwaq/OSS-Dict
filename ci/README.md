@@ -7,8 +7,9 @@
 
 `smoke/smoke.py` installs the built APKs on an emulator and walks through bookmark folders
 and notes from the outside, with adb: it looks words up in a small test dictionary, files
-them, renames and deletes folders, restarts the app. The release is only published when
-every expected element showed up and the app did not crash.
+them, renames and deletes folders, restarts the app, exports and imports a backup. The
+release is only published when every expected element showed up and the app did not crash;
+the releases of earlier builds are then marked as older.
 
 The screenshots and the texts on screen after each step are pushed to the `ci-smoke`
 branch, the logs of a build that failed to the `ci-logs` branch. Both branches hold the
