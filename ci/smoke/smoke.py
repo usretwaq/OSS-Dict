@@ -186,7 +186,9 @@ def back():
 
 
 def start_main():
-    shell("am start -W -n %s" % MAIN)
+    # CLEAR_TOP: an article opened from a list sits on top of the main screen in the same
+    # task, and a plain start would only bring that article back to the front
+    shell("am start -W --activity-clear-top -n %s" % MAIN)
     time.sleep(1.5)
 
 
