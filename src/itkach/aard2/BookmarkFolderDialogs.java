@@ -76,6 +76,20 @@ public final class BookmarkFolderDialogs {
                 }, onSaved);
     }
 
+    @MainThread
+    public static void editBookmarks(@NonNull Context context, @NonNull List<BlobDescriptor> targets,
+                                     @Nullable Runnable onSaved) {
+        if (targets.isEmpty()) {
+            return;
+        }
+        boolean single = targets.size() == 1;
+        String title = single ? targets.get(0).key
+                : context.getString(R.string.specified_number_of_items_selected, targets.size());
+        showEditDialog(context, title, targets, single, (addFolders, removeFolders, note) ->
+                SlobHelper.getInstance().bookmarks.annotate(targets, addFolders, removeFolders, note),
+                onSaved);
+    }
+
     private static void showEditDialog(@NonNull Context context, @Nullable CharSequence title,
                                        @NonNull List<BlobDescriptor> current, boolean withNote,
                                        @NonNull OnEdited onEdited, @Nullable Runnable onSaved) {
