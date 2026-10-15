@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="itkach.aard2.descriptor.BookmarkFoldersTest" tests="22" skipped="0" failures="0" errors="0" timestamp="2026-10-15T16:42:21.611Z" hostname="runnervm8k3b6" time="0.009">
+  <properties/>
+  <testcase name="setNoteStoresTrimmedTextAndReportsChange" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.001"/>
+  <testcase name="mergeIntoFillsAMissingNoteOnly" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="mergeIntoAddsFoldersWithoutRemovingAny" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="updateReplacesTheListInsteadOfChangingItInPlace" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="renameOntoAFolderTheBookmarkIsAlreadyInKeepsOneEntry" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="normalizeNameCapsTheLength" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.001"/>
+  <testcase name="findIgnoreCaseReturnsTheStoredSpelling" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="updateNeverStoresAFolderTwice" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="collectListsEveryFolderOnce" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.001"/>
+  <testcase name="removeTakesBookmarksOutOfTheFolderButKeepsThem" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="searchIgnoresCaseAndAccents" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.003"/>
+  <testcase name="countCountsBookmarksPerFolder" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.001"/>
+  <testcase name="renameChangesTheFolderOnEveryBookmarkInIt" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="updateReportsNoChangeWhenNothingChanges" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="updateAddsAndRemovesAndLeavesOtherFoldersAlone" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="updateCopesWithMissingFolderList" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="blankNoteClearsIt" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="newBookmarkIsUnfiled" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="searchLooksForEveryWordTyped" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="searchWithNothingTypedKeepsEveryNameInOrder" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="normalizeNameTrimsAndRejectsBlank" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <testcase name="bookmarkCanBeInSeveralFolders" classname="itkach.aard2.descriptor.BookmarkFoldersTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

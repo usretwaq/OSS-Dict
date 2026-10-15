@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="itkach.aard2.descriptor.SlobDescriptorTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-15T16:42:21.641Z" hostname="runnervm8k3b6" time="0.001">
+  <properties/>
+  <testcase name="missingLabelTagYieldsPlaceholder" classname="itkach.aard2.descriptor.SlobDescriptorTest" time="0.001"/>
+  <testcase name="originalLabelIgnoresCustomName" classname="itkach.aard2.descriptor.SlobDescriptorTest" time="0.0"/>
+  <testcase name="blankCustomNameFallsBackToDictionaryLabel" classname="itkach.aard2.descriptor.SlobDescriptorTest" time="0.0"/>
+  <testcase name="labelFallsBackToDictionaryLabel" classname="itkach.aard2.descriptor.SlobDescriptorTest" time="0.0"/>
+  <testcase name="customNameOverridesDictionaryLabel" classname="itkach.aard2.descriptor.SlobDescriptorTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

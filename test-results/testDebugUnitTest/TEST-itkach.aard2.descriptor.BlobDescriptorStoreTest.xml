@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="itkach.aard2.descriptor.BlobDescriptorStoreTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-15T16:42:21.577Z" hostname="runnervm8k3b6" time="0.033">
+  <properties/>
+  <testcase name="foldersAndNoteSurviveRoundTrip" classname="itkach.aard2.descriptor.BlobDescriptorStoreTest" time="0.026"/>
+  <testcase name="legacyRecoveryKeepsFoldersAndNote" classname="itkach.aard2.descriptor.BlobDescriptorStoreTest" time="0.003"/>
+  <testcase name="bookmarkStoredBeforeFoldersAndNotesExistedStillLoads" classname="itkach.aard2.descriptor.BlobDescriptorStoreTest" time="0.001"/>
+  <testcase name="bookmarkWithoutFoldersOrNoteStaysEmpty" classname="itkach.aard2.descriptor.BlobDescriptorStoreTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
