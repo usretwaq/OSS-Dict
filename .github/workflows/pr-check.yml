@@ -1,0 +1,256 @@
+name: PR check
+
+# Checks a pull request branch from a scratch check/** branch: that branch is the pull
+# request's commits plus one last commit holding this workflow and the ci/ files, which is
+# not part of the pull request. It compiles every commit of the pull request, lints it,
+# runs it on an emulator and records screenshots and videos for its description.
+
+on:
+  push:
+    branches:
+      - 'check/**'
+
+concurrency:
+  group: pr-check-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  KEYSTORE_FILE: ci/personal-build.keystore
+  KEYSTORE_PASSWORD: ossdict-plus
+  KEYSTORE_ALIAS: ossdictplus
+  # The pull request keeps the original app id
+  APP_PACKAGE: com.akylas.aard2
+
+jobs:
+  commits:
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.list.outputs.list }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: List the commits of the pull request
+        id: list
+        run: |
+          base=$(git merge-base HEAD origin/master)
+          git log --oneline "${base}..HEAD"
+          list=$(git rev-list --reverse "${base}..HEAD~1" | jq -R . | jq -sc .)
+          echo "list=${list}" >> "$GITHUB_OUTPUT"
+
+  compile:
+    needs: commits
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        commit: ${{ fromJSON(needs.commits.outputs.list) }}
+    steps:
+      - name: Checkout the commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.commit }}
+          submodules: recursive
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Compile
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Unit tests of the bookmark storage
+        run: ./gradlew --no-daemon testDebugUnitTest --tests 'itkach.aard2.descriptor.*'
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build signed APKs
+        run: |
+          ./gradlew --no-daemon assembleRelease assembleDebug \
+            -Pandroid.injected.signing.store.file="${GITHUB_WORKSPACE}/${KEYSTORE_FILE}" \
+            -Pandroid.injected.signing.store.password="${KEYSTORE_PASSWORD}" \
+            -Pandroid.injected.signing.key.alias="${KEYSTORE_ALIAS}" \
+            -Pandroid.injected.signing.key.password="${KEYSTORE_PASSWORD}"
+          mkdir -p dist
+          cp "$(ls build/outputs/apk/release/*.apk | head -1)" dist/OSS-Dict-pr.apk
+          cp "$(ls build/outputs/apk/debug/*.apk | head -1)" dist/OSS-Dict-pr-debug.apk
+          ls -la dist
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: apks
+          path: dist/*.apk
+          retention-days: 7
+          if-no-files-found: error
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Lint
+        run: ./gradlew --no-daemon lint
+
+      - name: Keep the lint report
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/out
+          cp build/reports/lint-results-debug.txt build/reports/lint-results-debug.xml /tmp/out/ 2>/dev/null || true
+          cd /tmp/out
+          echo "run ${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT} commit ${GITHUB_SHA}" > RUN.txt
+          git init -q
+          git checkout -q -b ci-lint-pr
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
+            commit -q -m "Lint report of check run ${GITHUB_RUN_NUMBER} (${GITHUB_SHA})"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-lint-pr
+
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download the APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: apks
+          path: dist
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the walk-through on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          enable-hw-keyboard: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: python3 ci/smoke/smoke.py dist smoke-out
+
+      - name: Keep the screenshots
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p smoke-out
+          cd smoke-out
+          rm -rf dictionaries
+          echo "run ${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT} commit ${GITHUB_SHA}" > RUN.txt
+          git init -q
+          git checkout -q -b ci-smoke-pr
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
+            commit -q -m "Emulator run of check run ${GITHUB_RUN_NUMBER} (${GITHUB_SHA})"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-smoke-pr
+
+  media:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download the APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: apks
+          path: dist
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Record the tour on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          enable-hw-keyboard: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: python3 ci/smoke/tour.py dist tour-out
+
+      - name: Turn the videos into GIFs
+        if: always()
+        run: |
+          which ffmpeg || (sudo apt-get update -q && sudo apt-get install -y -q ffmpeg)
+          cd tour-out/media 2>/dev/null || exit 0
+          for video in *.mp4; do
+            [ -s "$video" ] || continue
+            ffmpeg -loglevel error -y -i "$video" -vf "fps=10,scale=320:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" -loop 0 "${video%.mp4}.gif"
+          done
+          ls -la
+
+      - name: Keep the media
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p tour-out
+          cd tour-out
+          rm -rf steps/dictionaries
+          echo "run ${GITHUB_RUN_NUMBER} attempt ${GITHUB_RUN_ATTEMPT} commit ${GITHUB_SHA}" > RUN.txt
+          git init -q
+          git checkout -q -b pr-media
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
+            commit -q -m "Screenshots and videos of check run ${GITHUB_RUN_NUMBER} (${GITHUB_SHA})"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" pr-media
