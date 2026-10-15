@@ -44,7 +44,7 @@ jobs:
       - name: Unit tests
         run: |
           set +e
-          ./gradlew --no-daemon testDebugUnitTest --tests 'itkach.aard2.descriptor.*' > tests.log 2>&1
+          ./gradlew --no-daemon :testDebugUnitTest --tests 'itkach.aard2.descriptor.*' > tests.log 2>&1
           echo "exit code $?" >> tests.log
           tail -5 tests.log
 
