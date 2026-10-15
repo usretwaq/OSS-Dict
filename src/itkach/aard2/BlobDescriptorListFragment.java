@@ -20,6 +20,10 @@ import androidx.core.content.ContextCompat;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import itkach.aard2.descriptor.BlobDescriptor;
 
 abstract class BlobDescriptorListFragment extends BaseListFragment implements ActionMode.Callback {
     protected ActionMode actionMode;
@@ -44,6 +48,10 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
     abstract int getDeleteConfirmationItemCountResId();
 
     abstract String getPreferencesNS();
+
+    boolean supportsFolders() {
+        return false;
+    }
 
     @NonNull
     private SharedPreferences prefs() {
@@ -93,6 +101,19 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         icArrowDown = ContextCompat.getDrawable(activity, R.drawable.ic_sort_descending);
 
         recyclerView.setAdapter(listAdapter);
+    }
+
+    @NonNull
+    private List<BlobDescriptor> getSelectedItems() {
+        List<BlobDescriptor> selected = new ArrayList<>();
+        SparseBooleanArray checkedItems = listAdapter.getCheckedItemPositions();
+        for (int index = 0; index < checkedItems.size(); index++) {
+            int position = checkedItems.keyAt(index);
+            if (checkedItems.valueAt(index) && position >= 0 && position < listAdapter.getItemCount()) {
+                selected.add(listAdapter.getItem(position));
+            }
+        }
+        return selected;
     }
 
     protected void deleteSelectedItems() {
@@ -220,6 +241,7 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
         actionMode = mode;
         if (mode != null) {
             mode.getMenuInflater().inflate(R.menu.blob_descriptor_selection, menu);
+            menu.findItem(R.id.blob_descriptor_folders).setVisible(supportsFolders());
         }
         listAdapter.setSelectionMode(true);
         return true;
@@ -250,6 +272,9 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
                     .create();
             deleteConfirmationDialog.setOnDismissListener(dialogInterface -> deleteConfirmationDialog = null);
             deleteConfirmationDialog.show();
+            return true;
+        } else if (itemId == R.id.blob_descriptor_folders) {
+            BookmarkFolderDialogs.editBookmarks(requireActivity(), getSelectedItems(), mode::finish);
             return true;
         } else if (itemId == R.id.blob_descriptor_select_all) {
             listAdapter.selectAll();
