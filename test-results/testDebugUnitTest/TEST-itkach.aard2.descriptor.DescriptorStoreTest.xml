@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="itkach.aard2.descriptor.DescriptorStoreTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-15T16:42:32.950Z" hostname="runnervm8k3b6" time="0.062">
+  <properties/>
+  <testcase name="displayNameSurvivesRoundTrip" classname="itkach.aard2.descriptor.DescriptorStoreTest" time="0.054"/>
+  <testcase name="legacyRecoveryKeepsDisplayName" classname="itkach.aard2.descriptor.DescriptorStoreTest" time="0.005"/>
+  <testcase name="missingDisplayNameStaysNull" classname="itkach.aard2.descriptor.DescriptorStoreTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

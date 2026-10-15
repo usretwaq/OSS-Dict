@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="itkach.aard2.descriptor.BlobDescriptorBackupTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-10-15T16:42:32.819Z" hostname="runnervm8k3b6" time="0.125">
+  <properties/>
+  <testcase name="selectNewSkipsSameKeyInSameDictionaryWithDifferentBlobId" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.099"/>
+  <testcase name="selectNewKeepsEntriesNotAlreadyPresent" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.001"/>
+  <testcase name="selectNewSkipsExactDuplicates" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.0"/>
+  <testcase name="readRejectsFutureVersion" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.01"/>
+  <testcase name="readRejectsNonJsonContent" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.001"/>
+  <testcase name="readSkipsEntriesWithoutDictionaryOrKey" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.001"/>
+  <testcase name="selectNewLeavesExistingListUntouched" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.0"/>
+  <testcase name="readsEmptyListsWhenNothingWasExported" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.005"/>
+  <testcase name="selectNewKeepsSameKeyFromAnotherDictionary" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.0"/>
+  <testcase name="readRejectsJsonArray" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.001"/>
+  <testcase name="readRejectsMissingFormat" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.0"/>
+  <testcase name="selectNewReplacesIdCollidingWithExistingEntry" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.001"/>
+  <testcase name="selectNewDedupesWithinImportedBatch" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.001"/>
+  <testcase name="writtenFileCarriesFormatMarkerAndVersion" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.0"/>
+  <testcase name="selectNewAssignsIdWhenMissing" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.001"/>
+  <testcase name="readRejectsForeignFormat" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.0"/>
+  <testcase name="roundTripKeepsBothListsAndEveryField" classname="itkach.aard2.descriptor.BlobDescriptorBackupTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
