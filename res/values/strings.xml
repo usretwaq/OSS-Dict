@@ -261,4 +261,15 @@
     <!-- About section -->
     <string name="setting_about_source">Source Code</string>
     <string name="setting_about_sponsor">Support on GitHub Sponsors</string>
+
+    <!-- Bookmark folders and notes -->
+    <string name="action_bookmark_folders">Folders &amp; note</string>
+    <string name="folders_title">Folders</string>
+    <string name="folders_new">New folder</string>
+    <string name="folders_name_hint">Folder name</string>
+    <string name="folders_none_yet">No folders yet</string>
+    <string name="bookmark_note_hint">Note</string>
+    <string name="bookmark_add_note_hint">Add a note or folders</string>
+    <string name="bookmark_folders_label">Folders: %1$s</string>
+    <string name="bookmark_confirm_remove">Remove this bookmark? Its note and folders will be lost.</string>
 </resources>
