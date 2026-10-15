@@ -147,4 +147,14 @@ public final class BookmarkFolders {
     public static boolean hasAnnotations(@NonNull BlobDescriptor descriptor) {
         return !isUnfiled(descriptor) || (descriptor.note != null && !descriptor.note.isEmpty());
     }
+
+    // What is stored wins: folders are only added, and the imported note only fills an empty one
+    public static boolean mergeInto(@NonNull BlobDescriptor stored, @NonNull BlobDescriptor imported) {
+        boolean changed = !isUnfiled(imported)
+                && update(stored, imported.folders, Collections.emptyList());
+        if (stored.note == null || stored.note.isEmpty()) {
+            changed |= setNote(stored, imported.note);
+        }
+        return changed;
+    }
 }

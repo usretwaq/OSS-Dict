@@ -286,12 +286,15 @@ public class BlobDescriptorList extends AbstractList<BlobDescriptor> {
      * Merges descriptors read from a backup file into this list.
      *
      * <p>Nothing is replaced or removed: entries already present are skipped
-     * (see {@link BlobDescriptorBackup#selectNew}).</p>
+     * (see {@link BlobDescriptorBackup#selectNew}), only gaining the backup's folders and note.</p>
      *
      * @return the number of entries actually added
      */
     @MainThread
     public int importDescriptors(@NonNull List<BlobDescriptor> imported) {
+        for (BlobDescriptor bd : BlobDescriptorBackup.mergeAnnotations(this.list, imported)) {
+            store.save(bd);
+        }
         List<BlobDescriptor> added = BlobDescriptorBackup.selectNew(this.list, imported);
         for (BlobDescriptor bd : added) {
             this.list.add(bd);
