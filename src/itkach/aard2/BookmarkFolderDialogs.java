@@ -211,6 +211,22 @@ public final class BookmarkFolderDialogs {
     }
 
     @MainThread
+    public static void showManageDialog(@NonNull Context context) {
+        List<String> names = getAllFolderNames();
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.folders_manage)
+                .setPositiveButton(R.string.folders_new, (dialog, which) -> promptNewFolder(context))
+                .setNegativeButton(R.string.action_cancel, null);
+        if (names.isEmpty()) {
+            builder.setMessage(R.string.folders_none_yet);
+        } else {
+            builder.setItems(names.toArray(new String[0]),
+                    (dialog, which) -> showFolderActions(context, names.get(which)));
+        }
+        builder.show();
+    }
+
+    @MainThread
     public static void showFolderActions(@NonNull Context context, @NonNull String folder) {
         String[] actions = {context.getString(R.string.action_rename), context.getString(R.string.delete)};
         new MaterialAlertDialogBuilder(context)
