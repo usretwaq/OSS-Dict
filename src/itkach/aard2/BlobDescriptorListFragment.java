@@ -2,10 +2,14 @@ package itkach.aard2;
 
 import android.app.Activity;
 import android.content.SharedPreferences;
+import android.content.res.TypedArray;
 import android.database.DataSetObserver;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.text.TextPaint;
+import android.text.TextUtils;
 import android.util.SparseBooleanArray;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -19,8 +23,12 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.view.ActionMode;
+import androidx.appcompat.widget.PopupMenu;
 import androidx.appcompat.widget.SearchView;
+import androidx.appcompat.widget.TooltipCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.MenuCompat;
+import androidx.core.widget.TextViewCompat;
 
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
@@ -49,6 +57,9 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
     private final static String PREF_FOLDER = "folder";
 
     private static final Object ALL_FOLDERS = new Object();
+
+    private static final int MENU_GROUP_FOLDERS = 1;
+    private static final int MENU_GROUP_ACTIONS = 2;
 
     private static final class FolderEntry {
         // A folder name, ALL_FOLDERS or BlobDescriptorList.FOLDER_UNFILED
@@ -128,6 +139,9 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
             folderChips = view.findViewById(R.id.folder_chips);
             folderScroll = view.findViewById(R.id.folder_scroll);
             folderBar = view.findViewById(R.id.folder_bar);
+            View folderMenu = view.findViewById(R.id.folder_menu);
+            TooltipCompat.setTooltipText(folderMenu, folderMenu.getContentDescription());
+            folderMenu.setOnClickListener(this::showFolderMenu);
             folderChips.addOnLayoutChangeListener((chips, left, top, right, bottom,
                                                    oldLeft, oldTop, oldRight, oldBottom) ->
                     chips.post(this::revealShownFolder));
@@ -313,6 +327,69 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
             });
         }
         chips.addView(chip);
+    }
+
+    private void showFolderMenu(@NonNull View anchor) {
+        String shown = getDescriptorList().getFolderFilter();
+        Object shownTag = shown == null ? ALL_FOLDERS : shown;
+        // The activity's context: the anchor's would give the menu the colours of a chip
+        PopupMenu popup = new PopupMenu(requireActivity(), anchor, Gravity.END);
+        Menu menu = popup.getMenu();
+        List<FolderEntry> entries = getFolderEntries();
+        int userFolders = 0;
+        for (FolderEntry entry : entries) {
+            if (entry.isUserFolder()) {
+                userFolders++;
+            }
+        }
+        TextPaint titlePaint = getMenuTitlePaint();
+        float titleRoom = getResources().getDimension(R.dimen.folder_menu_title_max_width);
+        MenuItem shownItem = null;
+        for (FolderEntry entry : entries) {
+            // A menu cuts titles off at the end, and with them the count: shortened in the
+            // middle, long names that begin alike also stay apart
+            CharSequence title = TextUtils.ellipsize(entry.label, titlePaint, titleRoom,
+                    TextUtils.TruncateAt.MIDDLE);
+            MenuItem item = menu.add(MENU_GROUP_FOLDERS, Menu.NONE, Menu.NONE, title);
+            item.setOnMenuItemClickListener(picked -> {
+                showFolder(entry);
+                return true;
+            });
+            if (shownTag.equals(entry.tag)) {
+                shownItem = item;
+            }
+        }
+        menu.setGroupCheckable(MENU_GROUP_FOLDERS, true, true);
+        if (shownItem != null) {
+            shownItem.setChecked(true);
+        }
+        menu.add(MENU_GROUP_ACTIONS, Menu.NONE, Menu.NONE, R.string.folders_new)
+                .setOnMenuItemClickListener(picked -> {
+                    BookmarkFolderDialogs.promptNewFolder(requireActivity());
+                    return true;
+                });
+        if (userFolders > 0) {
+            menu.add(MENU_GROUP_ACTIONS, Menu.NONE, Menu.NONE, R.string.folders_manage)
+                    .setOnMenuItemClickListener(picked -> {
+                        BookmarkFolderDialogs.showManageDialog(requireActivity());
+                        return true;
+                    });
+        }
+        MenuCompat.setGroupDividerEnabled(menu, true);
+        popup.show();
+    }
+
+    @NonNull
+    private TextPaint getMenuTitlePaint() {
+        TypedArray attributes = requireActivity().obtainStyledAttributes(
+                new int[]{androidx.appcompat.R.attr.textAppearanceLargePopupMenu});
+        int appearance = attributes.getResourceId(0, 0);
+        attributes.recycle();
+        TextView sizer = new TextView(requireActivity());
+        if (appearance != 0) {
+            TextViewCompat.setTextAppearance(sizer, appearance);
+        }
+        return sizer.getPaint();
     }
 
     @NonNull

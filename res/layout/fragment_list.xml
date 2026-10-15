@@ -47,6 +47,22 @@
                 app:singleLine="true"
                 app:singleSelection="true" />
         </HorizontalScrollView>
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/folder_menu"
+            style="@style/Widget.Material3.Chip.Assist"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:contentDescription="@string/folders_list"
+            app:chipEndPadding="12dp"
+            app:chipIcon="@drawable/ic_keyboard_arrow_down"
+            app:chipIconSize="24dp"
+            app:chipStartPadding="12dp"
+            app:iconEndPadding="0dp"
+            app:iconStartPadding="0dp"
+            app:textEndPadding="0dp"
+            app:textStartPadding="0dp" />
     </LinearLayout>
 
     <itkach.aard2.widget.RecyclerView

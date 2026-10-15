@@ -279,4 +279,6 @@
     <string name="folders_exists">A folder with this name already exists</string>
     <string name="folders_confirm_delete">Delete the folder \"%1$s\"? The bookmarks in it are kept.</string>
     <string name="folders_empty_folder">No bookmarks in this folder</string>
+    <string name="folders_list">Folder list</string>
+    <string name="folders_manage">Manage folders</string>
 </resources>
