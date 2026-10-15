@@ -60,6 +60,9 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
 
     private static final int MENU_GROUP_FOLDERS = 1;
     private static final int MENU_GROUP_ACTIONS = 2;
+    private static final int MENU_GROUP_SEARCH = 3;
+    // Fewer folders fit on one screen of the folder list
+    private static final int FOLDER_SEARCH_MIN_FOLDERS = 8;
 
     private static final class FolderEntry {
         // A folder name, ALL_FOLDERS or BlobDescriptorList.FOLDER_UNFILED
@@ -333,6 +336,14 @@ abstract class BlobDescriptorListFragment extends BaseListFragment implements Ac
             if (entry.isUserFolder()) {
                 userFolders++;
             }
+        }
+        if (userFolders >= FOLDER_SEARCH_MIN_FOLDERS) {
+            menu.add(MENU_GROUP_SEARCH, Menu.NONE, Menu.NONE, R.string.folders_search)
+                    .setOnMenuItemClickListener(picked -> {
+                        BookmarkFolderDialogs.showSearchDialog(requireActivity(),
+                                folder -> getDescriptorList().setFolderFilter(folder));
+                        return true;
+                    });
         }
         TextPaint titlePaint = getMenuTitlePaint();
         float titleRoom = getResources().getDimension(R.dimen.folder_menu_title_max_width);
