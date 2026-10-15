@@ -1,0 +1,3 @@
+Delete the folder "Things"? The bookmarks in it are kept.
+Cancel
+Delete

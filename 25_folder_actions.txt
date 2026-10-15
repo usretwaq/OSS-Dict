@@ -1,0 +1,4 @@
+Verbs
+Rename
+Delete
+Cancel
