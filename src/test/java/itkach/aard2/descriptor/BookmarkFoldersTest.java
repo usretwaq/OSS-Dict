@@ -185,4 +185,27 @@ public class BookmarkFoldersTest {
         assertNull(descriptor.note);
         assertFalse(BookmarkFolders.setNote(descriptor, null));
     }
+
+    @Test
+    public void mergeIntoAddsFoldersWithoutRemovingAny() {
+        BlobDescriptor stored = bookmark("lopen", "Verbs");
+        BlobDescriptor imported = bookmark("lopen", "Week 1");
+
+        assertTrue(BookmarkFolders.mergeInto(stored, imported));
+        assertEquals(Arrays.asList("Verbs", "Week 1"), stored.folders);
+    }
+
+    @Test
+    public void mergeIntoFillsAMissingNoteOnly() {
+        BlobDescriptor stored = bookmark("lopen");
+        BlobDescriptor imported = bookmark("lopen");
+        imported.note = "Theirs";
+
+        assertTrue(BookmarkFolders.mergeInto(stored, imported));
+        assertEquals("Theirs", stored.note);
+
+        imported.note = "Changed";
+        assertFalse(BookmarkFolders.mergeInto(stored, imported));
+        assertEquals("Theirs", stored.note);
+    }
 }
