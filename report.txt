@@ -1,0 +1,33 @@
+== install
+   16 / API 36 / Physical size: 1080x2400
+  [01] first_start_no_dictionaries
+   in the dictionary folder: total 32
+drwxrws--- 2 u0_a216 ext_data_rw 4096 2026-10-15 16:57 .
+drwxrws--- 3 u0_a216 ext_data_rw 4096 2026-10-15 16:57 ..
+-rw-rw-rw- 1 shell   ext_data_rw  784 2026-10-15 16:57 smoke-nl-en.zip
+-rw-rw-rw- 1 shell   ext_data_rw  980 2026-10-15 16:54 test.dsl
+  [02] dictionaries_loaded_debug_build
+  [03] dictionaries_after_update_to_release
+   ok
+== article
+  picture folders-and-note-dialog
+  picture article-note-bar
+  recording 1-article: 624342 bytes 
+   ok
+== bookmarks
+  picture bookmarks-all
+  picture bookmarks-one-folder
+  picture folder-list
+  picture folders-for-two-bookmarks
+  picture bookmarks-after-filing-two
+  recording 2-bookmarks: 1167345 bytes 
+   ok
+== search
+  picture folder-list-with-search
+  picture folder-search
+  recording 3-search: 591611 bytes 
+   ok
+== dark
+  picture dark-bookmarks
+  picture dark-article-note-bar
+   ok
