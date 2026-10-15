@@ -1,0 +1,65 @@
+name: Unit test diagnosis
+
+# Scratch: runs the descriptor unit tests on the original code and on the pull request,
+# and keeps the reports on a branch, as the job logs cannot be read from where this is
+# being worked on.
+on:
+  push:
+    branches:
+      - 'diag/**'
+
+permissions:
+  contents: write
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        tree: [master, pull-request]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Pick the tree
+        run: |
+          if [ "${{ matrix.tree }}" = master ]; then git checkout -q "$(git merge-base HEAD origin/master)"; else git checkout -q HEAD~1; fi
+          git submodule update --init --recursive
+          git log --oneline -1
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        run: |
+          set +e
+          ./gradlew --no-daemon testDebugUnitTest --tests 'itkach.aard2.descriptor.*' > tests.log 2>&1
+          echo "exit code $?" >> tests.log
+          tail -5 tests.log
+
+      - name: Keep the reports
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/out
+          cp tests.log /tmp/out/ || true
+          cp -r build/test-results /tmp/out/test-results 2>/dev/null || true
+          cd /tmp/out
+          git init -q
+          git checkout -q -b "diag-tests-${{ matrix.tree }}"
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
+            commit -q -m "Unit test reports (${{ matrix.tree }})"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "diag-tests-${{ matrix.tree }}"
