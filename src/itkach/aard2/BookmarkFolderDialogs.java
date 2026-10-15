@@ -4,12 +4,16 @@ import android.content.Context;
 import android.net.Uri;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.MainThread;
@@ -26,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -222,6 +227,67 @@ public final class BookmarkFolderDialogs {
                     (dialog, which) -> showFolderActions(context, names.get(which)));
         }
         builder.show();
+    }
+
+    @MainThread
+    public static void showSearchDialog(@NonNull Context context, @NonNull Consumer<String> onPicked) {
+        List<String> names = getAllFolderNames();
+        Map<String, Integer> counts = SlobHelper.getInstance().bookmarks.getFolderCounts();
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(context);
+        View content = LayoutInflater.from(builder.getContext()).inflate(R.layout.dialog_folder_search, null);
+        EditText input = content.findViewById(R.id.folder_search_input);
+        ListView list = content.findViewById(R.id.folder_search_list);
+        ArrayAdapter<String> found = new ArrayAdapter<String>(builder.getContext(),
+                R.layout.folder_search_item, new ArrayList<>(names)) {
+            @NonNull
+            @Override
+            public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
+                TextView row = (TextView) super.getView(position, convertView, parent);
+                String name = getItem(position);
+                Integer count = counts.get(name);
+                row.setText(context.getString(R.string.folders_chip_label, name, count == null ? 0 : count));
+                return row;
+            }
+        };
+        list.setAdapter(found);
+        list.setEmptyView(content.findViewById(R.id.folder_search_empty));
+        int inset = context.getResources().getDimensionPixelSize(R.dimen.folder_search_inset);
+        AlertDialog dialog = builder.setView(content)
+                .setNegativeButton(R.string.action_cancel, null)
+                .setBackgroundInsetTop(inset)
+                .setBackgroundInsetBottom(inset)
+                .create();
+        list.setOnItemClickListener((parent, view, position, id) -> {
+            String name = found.getItem(position);
+            dialog.dismiss();
+            if (name != null) {
+                onPicked.accept(name);
+            }
+        });
+        input.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence text, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence text, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable text) {
+                found.clear();
+                found.addAll(BookmarkFolders.search(names, text.toString()));
+            }
+        });
+        Window window = dialog.getWindow();
+        if (window != null) {
+            // At the top, so that the field stays put while the folders found come and go
+            window.setGravity(Gravity.TOP);
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE
+                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        }
+        input.requestFocus();
+        dialog.show();
     }
 
     @MainThread

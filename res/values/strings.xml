@@ -281,4 +281,6 @@
     <string name="folders_empty_folder">No bookmarks in this folder</string>
     <string name="folders_list">Folder list</string>
     <string name="folders_manage">Manage folders</string>
+    <string name="folders_search">Search folders</string>
+    <string name="folders_search_none">No folder with that name</string>
 </resources>

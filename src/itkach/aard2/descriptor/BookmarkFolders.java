@@ -3,17 +3,22 @@ package itkach.aard2.descriptor;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 public final class BookmarkFolders {
+    private static final Pattern MARKS = Pattern.compile("\\p{M}+");
+
     private BookmarkFolders() {
     }
 
@@ -31,6 +36,30 @@ public final class BookmarkFolders {
             }
         }
         return null;
+    }
+
+    // Ignores case and accents, and looks for each word typed apart: "ch 12" finds "Chapter 12"
+    @NonNull
+    public static List<String> search(@NonNull Collection<String> names, @Nullable String text) {
+        String[] words = fold(text == null ? "" : text).trim().split("\\s+");
+        List<String> found = new ArrayList<>();
+        for (String name : names) {
+            String folded = fold(name);
+            boolean hasEveryWord = true;
+            for (String word : words) {
+                hasEveryWord &= folded.contains(word);
+            }
+            if (hasEveryWord) {
+                found.add(name);
+            }
+        }
+        return found;
+    }
+
+    @NonNull
+    private static String fold(@NonNull String text) {
+        String decomposed = Normalizer.normalize(text, Normalizer.Form.NFD);
+        return MARKS.matcher(decomposed).replaceAll("").toLowerCase(Locale.ROOT);
     }
 
     public static boolean isIn(@NonNull BlobDescriptor descriptor, @NonNull String folder) {
