@@ -10,6 +10,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.EditText;
+import android.widget.Toast;
 
 import androidx.annotation.MainThread;
 import androidx.annotation.NonNull;
@@ -207,6 +208,61 @@ public final class BookmarkFolderDialogs {
             }
         }
         return null;
+    }
+
+    @MainThread
+    public static void showFolderActions(@NonNull Context context, @NonNull String folder) {
+        String[] actions = {context.getString(R.string.action_rename), context.getString(R.string.delete)};
+        new MaterialAlertDialogBuilder(context)
+                .setTitle(folder)
+                .setItems(actions, (dialog, which) -> {
+                    if (which == 0) {
+                        promptRenameFolder(context, folder);
+                    } else {
+                        confirmDeleteFolder(context, folder);
+                    }
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
+    }
+
+    @MainThread
+    public static void promptNewFolder(@NonNull Context context) {
+        promptFolderName(context, R.string.folders_new, null, name -> {
+            if (BookmarkFolders.findIgnoreCase(getAllFolderNames(), name) != null) {
+                Toast.makeText(context, R.string.folders_exists, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            BookmarkFolderPrefs.add(name);
+            SlobHelper.getInstance().bookmarks.notifyDataSetChanged();
+        });
+    }
+
+    private static void promptRenameFolder(@NonNull Context context, @NonNull String oldName) {
+        promptFolderName(context, R.string.folders_rename_title, oldName, newName -> {
+            if (newName.equals(oldName)) {
+                return;
+            }
+            String clash = BookmarkFolders.findIgnoreCase(getAllFolderNames(), newName);
+            // Changing only the case of the name clashes with the folder itself
+            if (clash != null && !clash.equals(oldName)) {
+                Toast.makeText(context, R.string.folders_exists, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            BookmarkFolderPrefs.rename(oldName, newName);
+            SlobHelper.getInstance().bookmarks.renameFolder(oldName, newName);
+        });
+    }
+
+    private static void confirmDeleteFolder(@NonNull Context context, @NonNull String folder) {
+        new MaterialAlertDialogBuilder(context)
+                .setMessage(context.getString(R.string.folders_confirm_delete, folder))
+                .setPositiveButton(R.string.delete, (dialog, which) -> {
+                    BookmarkFolderPrefs.remove(folder);
+                    SlobHelper.getInstance().bookmarks.deleteFolder(folder);
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
     }
 
     private static void promptFolderName(@NonNull Context context, @StringRes int title,
